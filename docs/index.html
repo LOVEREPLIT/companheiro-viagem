@@ -1,0 +1,1139 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10151d">
+<title>Companheiro de Viagem</title>
+<style>
+  :root{
+    --fundo:#10151d; --painel:#1a2230; --tinta:#e8edf5; --meia:#8b98ab;
+    --acento:#4fa3ff; --ok:#39c37f; --aviso:#e0a23c; --raio:14px;
+  }
+  *{box-sizing:border-box; margin:0}
+  html,body{height:100%}
+  body{
+    background:var(--fundo); color:var(--tinta);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  header{
+    display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    padding:10px 12px; background:var(--painel);
+  }
+  .chip{
+    background:#0d1219; border:1px solid #2a3547; border-radius:999px;
+    padding:3px 11px; font-size:13px; color:var(--meia); white-space:nowrap;
+  }
+  .chip b{color:var(--tinta); font-weight:600}
+  #chipCanal b{color:var(--acento)}
+  #log{flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px}
+  .e{background:var(--painel); border-radius:var(--raio); padding:12px 14px}
+  .e .tag{font-size:12px; letter-spacing:.06em; color:var(--acento); font-weight:700}
+  .e p{margin-top:5px; font-size:17px}
+  .e.cmd{background:transparent; border:1px dashed #2a3547; color:var(--meia)}
+  .e.cmd p{font-size:14px; margin-top:0}
+  nav{
+    display:flex; flex-direction:column; gap:6px;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:var(--painel);
+  }
+  nav .fila{display:grid; gap:6px}
+  nav .fila.canais{grid-template-columns:repeat(5,1fr)}
+  nav .fila.icones{grid-template-columns:repeat(4,1fr)}
+  nav button{
+    border:0; border-radius:10px; background:#0d1219; color:var(--meia);
+    padding:11px 4px; font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+  nav button.on{background:var(--acento); color:#06111f}
+  nav button.icone{font-size:18px; padding:11px 12px}
+  nav button.alerta{background:var(--aviso); color:#06111f}
+  #defs{
+    position:fixed; inset:0; background:rgba(8,11,16,.72); display:none;
+    align-items:flex-end; z-index:30;
+  }
+  #defs.aberto{display:flex}
+  #defs>div{
+    background:var(--painel); width:100%; max-height:82vh; overflow-y:auto;
+    border-radius:18px 18px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  #defs h2{font-size:16px; margin-bottom:10px}
+  #defs h3{font-size:13.5px; color:var(--meia); margin:16px 0 6px; text-transform:uppercase; letter-spacing:.05em}
+  .linha{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; font-size:15px}
+  .linha select{background:#0d1219; color:var(--tinta); border:1px solid #2a3547; border-radius:8px; padding:5px 8px; font-size:14px}
+  .linha input[type=checkbox]{width:20px; height:20px; accent-color:var(--acento)}
+  .sub{padding-left:14px; border-left:2px solid #2a3547; margin-left:4px}
+  #arranque{
+    position:fixed; inset:0; background:var(--fundo); z-index:40;
+    display:flex; flex-direction:column; justify-content:center; gap:14px; padding:26px;
+  }
+  #arranque h1{font-size:26px}
+  #arranque p{color:var(--meia); font-size:15px}
+  #arranque .linha{font-size:16px}
+  #ligar{
+    margin-top:12px; border:0; border-radius:16px; background:var(--acento);
+    color:#06111f; font-size:21px; font-weight:800; padding:18px; cursor:pointer;
+  }
+  #avisoRec{font-size:13px; color:var(--aviso)}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="chip" id="chipModo"><b>—</b></span>
+  <span class="chip" id="chipVel"><b>0</b> km/h</span>
+  <span class="chip" id="chipCanal">canal <b>história</b></span>
+  <span class="chip" id="chipLocal">—</span>
+  <span class="chip" id="chipMic" hidden>🎙 a ouvir</span>
+</header>
+
+<main id="log"></main>
+
+<nav>
+  <div class="fila canais">
+    <button data-canal="HISTORIA" class="on">História</button>
+    <button data-canal="SABORES">Sabores</button>
+    <button data-canal="ECONOMIA">Economia</button>
+    <button data-canal="DEMOGRAFIA">Números</button>
+    <button data-canal="ACTUALIDADE">Notícias</button>
+  </div>
+  <div class="fila icones">
+    <button id="bSalta" class="icone" title="saltar">⏭</button>
+    <button id="bMic" class="icone" title="microfone">🎙</button>
+    <button id="bSom" class="icone" title="silêncio">🔊</button>
+    <button id="bDefs" class="icone" title="preferências">⚙️</button>
+  </div>
+</nav>
+
+<div id="defs"><div>
+  <h2>Preferências — o que o companheiro conta</h2>
+  <p style="color:var(--meia);font-size:13.5px">Tudo isto também se muda por voz: «sem densidade populacional», «mais detalhe», «canal economia»…</p>
+
+  <h3>História</h3>
+  <div class="linha"><span>Ativo</span><input type="checkbox" data-ativo="HISTORIA" checked></div>
+  <div class="linha"><span>Detalhe</span><select data-detalhe="HISTORIA"><option value="1">curto</option><option value="2" selected>normal</option><option value="3">longo</option></select></div>
+
+  <h3>Sabores e tradições</h3>
+  <div class="linha"><span>Ativo</span><input type="checkbox" data-ativo="SABORES" checked></div>
+  <div class="linha"><span>Detalhe</span><select data-detalhe="SABORES"><option value="1">curto</option><option value="2" selected>normal</option><option value="3">longo</option></select></div>
+
+  <h3>Economia</h3>
+  <div class="linha"><span>Ativo</span><input type="checkbox" data-ativo="ECONOMIA" checked></div>
+  <div class="linha"><span>Detalhe</span><select data-detalhe="ECONOMIA"><option value="1">curto</option><option value="2" selected>normal</option><option value="3">longo</option></select></div>
+
+  <h3>Números (demografia)</h3>
+  <div class="linha"><span>Ativo</span><input type="checkbox" data-ativo="DEMOGRAFIA" checked></div>
+  <div class="linha"><span>Detalhe</span><select data-detalhe="DEMOGRAFIA"><option value="1">curto</option><option value="2" selected>normal</option><option value="3">longo</option></select></div>
+  <div class="sub">
+    <div class="linha"><span>População</span><input type="checkbox" data-demo="populacao" checked></div>
+    <div class="linha"><span>Densidade populacional</span><input type="checkbox" data-demo="densidade" checked></div>
+    <div class="linha"><span>Área</span><input type="checkbox" data-demo="area" checked></div>
+    <div class="linha"><span>Altitude</span><input type="checkbox" data-demo="altitude" checked></div>
+  </div>
+
+  <h3>Notícias</h3>
+  <div class="linha"><span>Ativo</span><input type="checkbox" data-ativo="ACTUALIDADE" checked></div>
+  <div class="linha"><span>Detalhe</span><select data-detalhe="ACTUALIDADE"><option value="1">curto</option><option value="2" selected>normal</option><option value="3">longo</option></select></div>
+  <div class="sub">
+    <div class="linha"><span>Avisos IPMA e incêndios</span><input type="checkbox" data-extra="avisos" checked></div>
+    <div class="linha"><span>Filhos da terra (figuras ilustres)</span><input type="checkbox" data-extra="gente" checked></div>
+    <div class="linha"><span>Rua e bairro (a pé)</span><input type="checkbox" data-extra="rua" checked></div>
+  </div>
+
+  <h3>O teu perfil (aprendido com o uso)</h3>
+  <p style="color:var(--meia);font-size:13px">Ouvir um canal até ao fim sobe o interesse; «salta» desce-o. A mistura adapta-se sozinha.</p>
+  <div id="perfilPesos" style="color:var(--tinta);font-size:14px;padding:6px 0;line-height:1.9"></div>
+  <div id="perfilViagens" style="color:var(--meia);font-size:13px;padding-bottom:4px"></div>
+  <div class="linha"><button id="bEsquece" style="width:100%;padding:10px;border:0;border-radius:10px;background:#0d1219;color:var(--aviso);font-weight:600;font-size:14px">Esquecer memória de viagens e interesses</button></div>
+
+  <h3>Narrador com IA local (experimental)</h3>
+  <p style="color:var(--meia);font-size:13px">Um modelo de linguagem a correr no próprio telemóvel (nada sai para a nuvem) reescreve os factos como narração natural. Descarrega ~1 GB uma única vez — fá-lo em Wi-Fi. Os factos vêm sempre das fontes; a IA só os conta melhor.</p>
+  <div class="linha"><span>Ativar narrador IA</span><input type="checkbox" id="chkIA"></div>
+  <div class="linha"><span id="estadoIA" style="color:var(--meia);font-size:13px">desligado</span></div>
+
+  <h3>Voz</h3>
+  <div class="linha"><span>Língua</span><select id="selLingua">
+    <option value="pt-PT" selected>Português (Portugal)</option>
+    <option value="pt-BR">Português (Brasil)</option>
+    <option value="en-GB">English</option>
+    <option value="es-ES">Español</option>
+    <option value="fr-FR">Français</option>
+  </select></div>
+
+  <div class="linha" style="margin-top:14px"><button id="bFechaDefs" style="width:100%;padding:12px;border:0;border-radius:10px;background:var(--acento);color:#06111f;font-weight:700;font-size:15px">Fechar</button></div>
+</div></div>
+
+<div id="arranque">
+  <h1>Companheiro de Viagem</h1>
+  <p>Sem destino. Liga, e ele conta-te a história, a economia, os números e as
+     notícias dos sítios por onde passas — em voz alta, antecipando o que vem
+     a seguir pela tua direção.</p>
+  <div class="linha"><span>Posição</span><select id="selFonte">
+    <option value="gps" selected>GPS real</option>
+    <option value="sim">Simulação (teste no PC)</option>
+  </select></div>
+  <div class="linha" id="linhaRota" hidden><span>Rota simulada</span><select id="selRota">
+    <option value="a1">A1 Lisboa→Porto (carro)</option>
+    <option value="alentejo">Alentejo (carro)</option>
+    <option value="douro">Douro (carro)</option>
+    <option value="baixa-lisboa">Baixa de Lisboa (a pé)</option>
+  </select></div>
+  <div class="linha" id="linhaTurbo" hidden><span>Acelerar tempo</span><select id="selTurbo">
+    <option value="20">20×</option><option value="60" selected>60×</option><option value="200">200×</option>
+  </select></div>
+  <p id="avisoRec"></p>
+  <button id="ligar">Ligar companheiro</button>
+</div>
+
+<script>
+"use strict";
+/* ═══════════════════ utilidades ═══════════════════ */
+const $ = s => document.querySelector(s);
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const norm = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+
+const R_TERRA = 6371000;
+function distM(la1,lo1,la2,lo2){
+  const r = Math.PI/180, a1=la1*r, a2=la2*r, dlo=(lo2-lo1)*r;
+  const h = Math.sin((a2-a1)/2)**2 + Math.cos(a1)*Math.cos(a2)*Math.sin(dlo/2)**2;
+  return 2*R_TERRA*Math.asin(Math.sqrt(h));
+}
+function rumoG(la1,lo1,la2,lo2){
+  const r = Math.PI/180, dlo=(lo2-lo1)*r;
+  const x = Math.sin(dlo)*Math.cos(la2*r);
+  const y = Math.cos(la1*r)*Math.sin(la2*r)-Math.sin(la1*r)*Math.cos(la2*r)*Math.cos(dlo);
+  return (Math.atan2(x,y)*180/Math.PI+360)%360;
+}
+function avanca(lat,lon,rumo,dist){          // previsão: onde vou estar a seguir
+  const r=Math.PI/180, d=dist/R_TERRA, th=rumo*r, la1=lat*r, lo1=lon*r;
+  const la2=Math.asin(Math.sin(la1)*Math.cos(d)+Math.cos(la1)*Math.sin(d)*Math.cos(th));
+  const lo2=lo1+Math.atan2(Math.sin(th)*Math.sin(d)*Math.cos(la1),Math.cos(d)-Math.sin(la1)*Math.sin(la2));
+  return [la2/r, lo2/r];
+}
+function frases(t,n){
+  t=(t||"").replace(/={2,}[^=\n]{0,80}={2,}/g," ").replace(/\s+/g," ").trim();
+  return t.split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/).slice(0,n).join(" ");
+}
+function seccoes(t){
+  const fora={"":""}; let ult=""; const re=/\n=+\s*([^=\n]{1,80}?)\s*=+/g;
+  let m, pos=0;
+  while((m=re.exec("\n"+t))!==null){
+    fora[ult]=(fora[ult]||"")+("\n"+t).slice(pos,m.index); ult=m[1].trim().toLowerCase(); pos=re.lastIndex;
+  }
+  fora[ult]=(fora[ult]||"")+("\n"+t).slice(pos);
+  return fora;
+}
+function paraVoz(t){
+  t=(t||"").replace(/https?:\/\/\S+/g,"")
+    .replace(/\d{1,3}(?: \d{3})+/g, m=>m.replace(/ /g,""))
+    .replace(/hab\.?\s*\/\s*km²/g,"habitantes por quilómetro quadrado")
+    .replace(/km²/g,"quilómetros quadrados")
+    .replace(/\b(\d+) m\b/g,"$1 metros").replace(/\bkm\/h\b/g,"quilómetros por hora")
+    .replace(/[·—↳]/g,", ").replace(/\s+/g," ").trim();
+  if(t.length>750){ const c=t.slice(0,750); t=c.slice(0,c.lastIndexOf(".")+1)||c; }
+  return t;
+}
+
+/* ═══════════════════ estado + preferências ═══════════════════ */
+const S = {
+  canal:"HISTORIA", silencio:false, micAtivo:false, anunciando:false,
+  ativos:{HISTORIA:true, SABORES:true, ECONOMIA:true, DEMOGRAFIA:true, ACTUALIDADE:true},
+  detalhe:{HISTORIA:2, SABORES:2, ECONOMIA:2, DEMOGRAFIA:2, ACTUALIDADE:2},
+  demo:{populacao:true, densidade:true, area:true, altitude:true},
+  extra:{avisos:true, gente:true, rua:true},
+  lingua:"pt-PT",
+  veloc:0, rumo:null, ultimaPos:null, dAcum:0, ultimoAnuncioD:-1e12,
+  ultimoConcelho:null, ultimaRua:null, ditos:new Set(), ultimoTexto:"",
+  saltos:{},
+};
+const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
+               DEMOGRAFIA:"números", ACTUALIDADE:"notícias"};
+
+function guardaPrefs(){
+  localStorage.setItem("cv-prefs", JSON.stringify(
+    {canal:S.canal, ativos:S.ativos, detalhe:S.detalhe, demo:S.demo,
+     extra:S.extra, lingua:S.lingua}));
+}
+function lePrefs(){
+  try{
+    const p=JSON.parse(localStorage.getItem("cv-prefs")||"{}");
+    Object.assign(S.ativos, p.ativos||{}); Object.assign(S.detalhe, p.detalhe||{});
+    Object.assign(S.demo, p.demo||{}); Object.assign(S.extra, p.extra||{});
+    if(p.canal&&NOMES[p.canal]) S.canal=p.canal; if(p.lingua) S.lingua=p.lingua;
+  }catch(e){}
+}
+
+/* ── memória de viagens: persiste entre sessões, no próprio telemóvel ──
+   ditos      → cada facto contado, com data (nunca repetir; "coisas novas")
+   visitas    → quando estiveste em cada concelho ("já por aqui passaste em…")
+   entidades  → pessoas e lugares de que já ouviste falar, e onde (ligações)
+   pesos      → interesse aprendido por canal (salta = desce; ouvir = sobe)  */
+const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho",
+             "agosto","setembro","outubro","novembro","dezembro"];
+let M={ditos:{}, visitas:{}, entidades:{}, pesos:{}};
+try{ Object.assign(M, JSON.parse(localStorage.getItem("cv-mem")||"{}")); }catch(e){}
+S.ditos=new Set(Object.keys(M.ditos));
+
+let _tMem=null;
+function guardaMemoria(){
+  clearTimeout(_tMem);
+  _tMem=setTimeout(()=>{
+    const ks=Object.keys(M.ditos);
+    if(ks.length>3000)
+      ks.sort((a,b)=>M.ditos[a]-M.ditos[b]).slice(0,ks.length-2000)
+        .forEach(k=>{delete M.ditos[k]; S.ditos.delete(k);});
+    const es=Object.keys(M.entidades);
+    if(es.length>300)
+      es.sort((a,b)=>M.entidades[a].quando-M.entidades[b].quando)
+        .slice(0,es.length-200).forEach(k=>delete M.entidades[k]);
+    try{ localStorage.setItem("cv-mem",JSON.stringify(M)); }catch(e){}
+  },800);
+}
+function marcaDito(chave){ S.ditos.add(chave); M.ditos[chave]=Date.now(); guardaMemoria(); }
+function registaEntidade(nome,onde){
+  if(!nome||nome.length<5||!onde) return;
+  if(!M.entidades[nome]) M.entidades[nome]={onde, quando:Date.now()};
+  guardaMemoria();
+}
+function reforca(canal,fator){
+  if(!canal||!NOMES[canal]) return;
+  M.pesos[canal]=Math.min(2.5,Math.max(0.3,(M.pesos[canal]||1)*fator));
+  guardaMemoria();
+}
+function saudacaoRegresso(concelho){
+  const v=M.visitas[concelho]||[], ultima=v[v.length-1], agora=Date.now();
+  if(!ultima||agora-ultima>20*3600e3){ v.push(agora); M.visitas[concelho]=v.slice(-10); guardaMemoria(); }
+  if(ultima&&agora-ultima>20*3600e3){
+    const d=new Date(ultima), anoDif=d.getFullYear()!==new Date().getFullYear();
+    return `Já por aqui tinhas passado em ${MESES[d.getMonth()]}${anoDif?" de "+d.getFullYear():""} — desta vez conto-te coisas novas. `;
+  }
+  return "";
+}
+
+/* ═══════════════════ fontes (todas gratuitas, com CORS) ═══════════════════ */
+const cache=new Map(), _ult={};
+const RITMO={"nominatim.openstreetmap.org":1200,"overpass-api.de":2000};
+async function busca(url, tipo="json"){
+  if(cache.has(url)) return cache.get(url);
+  const host=new URL(url).host, gap=RITMO[host]||120;
+  const desde=Date.now()-(_ult[host]||0);
+  if(desde<gap) await espera(gap-desde);
+  _ult[host]=Date.now();
+  try{
+    const r=await fetch(url,{signal:AbortSignal.timeout(20000)});
+    if(!r.ok) throw new Error(r.status);
+    const v = tipo==="json" ? await r.json() : await r.text();
+    cache.set(url,v); return v;
+  }catch(e){ console.warn("fonte falhou:",host,e.message); return null; }
+}
+const WIKI = l => `https://${l}.wikipedia.org/w/api.php?origin=*&format=json&formatversion=2&action=query&`;
+
+async function nominatim(lat,lon){
+  const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=14&addressdetails=1&accept-language=pt`);
+  const a=(d&&d.address)||{};
+  const freg=a.suburb||a.village||a.town||a.city_district||a.parish;
+  const conc=a.municipality||a.city||a.town||a.county;
+  const linha=[freg,conc].filter(Boolean).join(" · ")||(d&&d.display_name)||"—";
+  return {freguesia:freg, concelho:conc, distrito:a.district||a.state, linha};
+}
+async function wikiGeo(lat,lon,lang,raio){
+  const d=await busca(WIKI(lang)+`list=geosearch&gscoord=${lat}%7C${lon}&gsradius=${Math.min(raio,10000)}&gslimit=30`);
+  return (d&&d.query&&d.query.geosearch)||[];
+}
+async function wikiPaginas(ids,lang,soIntro=true){
+  const fora={};
+  for(let i=0;i<ids.length;i+=20){
+    const d=await busca(WIKI(lang)+`prop=extracts%7Cpageprops%7Cinfo&explaintext=1&exlimit=20&inprop=url&ppprop=wikibase_item${soIntro?"&exintro=1":""}&pageids=${ids.slice(i,i+20).join("%7C")}`);
+    for(const p of (d&&d.query&&d.query.pages)||[]) fora[p.pageid]=p;
+  }
+  return fora;
+}
+async function wikidata(qids){
+  if(!qids.length) return {};
+  const d=await busca(`https://www.wikidata.org/w/api.php?origin=*&action=wbgetentities&format=json&ids=${qids.join("%7C")}&props=claims`);
+  return (d&&d.entities)||{};
+}
+async function overpass(lat,lon){
+  const q=`[out:json][timeout:20];(node(around:400,${lat},${lon})["historic"];node(around:400,${lat},${lon})["tourism"~"^(attraction|museum|artwork|viewpoint|gallery)$"];);out tags 30;`;
+  const d=await busca(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+  return (d&&d.elements)||[];
+}
+/* IPMA: avisos meteorológicos por distrito (API aberta, sem chave) */
+async function avisosIPMA(distrito){
+  if(!distrito) return [];
+  const areas=await busca("https://api.ipma.pt/open-data/distrits-islands.json");
+  const avisos=await busca("https://api.ipma.pt/open-data/forecast/warnings/warnings_www.json");
+  if(!areas||!avisos) return [];
+  const alvo=(areas.data||[]).find(a=>norm(a.local)===norm(distrito));
+  if(!alvo) return [];
+  const agora=new Date().toISOString();
+  const NIVEL={yellow:"amarelo",orange:"laranja",red:"vermelho"};
+  return avisos
+    .filter(a=>a.idAreaAviso===alvo.idAreaAviso && a.awarenessLevelID!=="green"
+               && a.endTime>agora && a.startTime<agora.replace(/T.*/,"T23:59:59"))
+    .slice(0,2)
+    .map(a=>({chave:`ipma:${a.idAreaAviso}:${a.awarenessTypeName}:${a.startTime.slice(0,10)}`,
+              texto:`Aviso ${NIVEL[a.awarenessLevelID]||a.awarenessLevelID} de ${a.awarenessTypeName} para o distrito de ${distrito}, válido até às ${parseInt(a.endTime.slice(11,13))} horas de dia ${parseInt(a.endTime.slice(8,10))}.`}));
+}
+/* Fogos.pt: incêndios ativos perto de nós */
+async function fogosPerto(lat,lon){
+  // a API do fogos.pt não aceita pedidos de outros sítios; vai pelo proxy
+  const d=await busca(`https://corsproxy.io/?url=${encodeURIComponent("https://api.fogos.pt/new/fires")}`);
+  if(!d||!d.success) return [];
+  return (d.data||[])
+    .map(f=>({f, km:distM(lat,lon,parseFloat(f.lat),parseFloat(f.lng))/1000}))
+    .filter(x=>x.km<40 && !isNaN(x.km))
+    .sort((a,b)=>a.km-b.km).slice(0,2)
+    .map(({f,km})=>{
+      const onde=f.concelho||String(f.location||"").split(",")[0];
+      const ops=f.man>0?`, com ${f.man} operacionais no terreno`:"";
+      return {chave:`fogo:${f.id}`,
+        texto:`Atenção: incêndio ativo no concelho de ${onde}, a ${Math.round(km)} quilómetros${ops}.`};
+    });
+}
+/* Wikidata SPARQL: figuras ilustres nascidas nesta terra */
+async function filhosDaTerra(qids){
+  if(!qids.length) return [];
+  const q=`SELECT ?pLabel ?desc WHERE {
+    VALUES ?l { ${qids.map(x=>"wd:"+x).join(" ")} }
+    ?p wdt:P19 ?l ; wikibase:sitelinks ?n .
+    OPTIONAL { ?p schema:description ?desc FILTER(LANG(?desc)="pt") }
+    SERVICE wikibase:label { bd:serviceParam wikibase:language "pt". }
+  } ORDER BY DESC(?n) LIMIT 4`;
+  const d=await busca(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(q)}`);
+  const bs=(((d||{}).results)||{}).bindings||[];
+  return bs.map(b=>({nome:b.pLabel.value, desc:((b.desc||{}).value||"").split(",")[0]}))
+           .filter(p=>!/^Q\d+$/.test(p.nome));
+}
+async function artigoPorTitulo(titulo,lang="pt"){
+  const d=await busca(WIKI(lang)+`prop=extracts&explaintext=1&exlimit=1&titles=${encodeURIComponent(titulo)}&redirects=1`);
+  const p=((d&&d.query&&d.query.pages)||[])[0];
+  return (p&&!p.missing&&p.extract)||null;
+}
+async function noticias(nome){
+  const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(`"${nome}" when:120d`)}&hl=pt-PT&gl=PT&ceid=PT:pt-150`;
+  const txt=await busca(`https://corsproxy.io/?url=${encodeURIComponent(rss)}`,"texto");
+  if(!txt) return [];
+  try{
+    const doc=new DOMParser().parseFromString(txt,"text/xml");
+    return [...doc.querySelectorAll("item")].slice(0,4).map(i=>({
+      titulo:(i.querySelector("title")||{}).textContent||"",
+      fonte:(i.querySelector("source")||{}).textContent||"",
+    }));
+  }catch(e){ return []; }
+}
+
+/* ═══════════════════ motor de factos (porta de factos.py) ═══════════════════ */
+/* atenção: em JS, \b falha antes de "é" (acentos não são \w) — usar (^|\s) */
+const RE_POVOACAO=/(?:^|\s)(?:é|foi)\s+(?:uma?|a|o)\s+(?:antiga\s+|pequena\s+|grande\s+)?(?:cidade|vila|freguesia|aldeia|munic[íi]pio|concelho|bairro|localidade|capital|povoa[çc][ãa]o|distrito)|\bis\s+(?:a|the)\s+(?:former\s+)?(?:town|city|village|civil parish|municipality|parish|district)\b/i;
+const RE_EXTINTA=/foi uma freguesia|antiga freguesia|foi extinta|era uma freguesia|former civil parish|extinta em/i;
+const BONUS=["castelo","igreja","mosteiro","convento","palácio","ponte","forte","fortaleza","museu","aqueduto","ruínas","solar","capela","torre","teatro","sé de","praça","miradouro","santuário","estação","farol","moinho","pelourinho"];
+const VETO=["lista de","anexo:","desambiguação","categoria:","(álbum)","(filme)","(banda)","campeonato","temporada de"];
+const ECON_FORTE=["economia","económic","indústria","industrial","agricultura","turismo","comércio","pesca","vinho","produção","fábrica","empresas","emprego","exporta","minas","pecuária","cortiça","olival"];
+
+function pontua(art,pag,modo){
+  const t=(art.title||"").toLowerCase(), ext=pag.extract||"";
+  if(VETO.some(v=>t.includes(v))) return -999;
+  let s=-(art.dist||0)/(modo==="carro"?120:12);
+  s += ext.length>700?30 : ext.length>350?20 : ext.length>150?8 : -45;
+  const cab=ext.slice(0,400).toLowerCase();
+  if(BONUS.some(b=>t.includes(b))) s+=22;
+  if(RE_POVOACAO.test(cab)) s+=(modo==="carro"?25:5);
+  if(RE_EXTINTA.test(cab)) s-=55;
+  return s;
+}
+async function escolher(lat,lon,modo){
+  const raio=modo==="carro"?9000:700;
+  let lang="pt", arts=await wikiGeo(lat,lon,"pt",raio);
+  if(arts.length<2){
+    const alt=await wikiGeo(lat,lon,"en",raio);
+    if(alt.length>arts.length){arts=alt;lang="en";}
+  }
+  if(!arts.length) return {escolhidos:[],lang,todos:[]};
+  const pags=await wikiPaginas(arts.map(a=>a.pageid),lang);
+  const todos=arts.map(a=>({titulo:a.title, texto:(pags[a.pageid]||{}).extract||""}));
+  const marc=arts.map(a=>({s:pontua(a,pags[a.pageid]||{},modo),a,p:pags[a.pageid]||{}}))
+                 .sort((x,y)=>y.s-x.s);
+  const fora=[],vistos=[];
+  for(const {s,a,p} of marc){
+    if(s<-100) continue;
+    const t=a.title.toLowerCase();
+    if(vistos.some(v=>v.includes(t)||t.includes(v))) continue;
+    vistos.push(t);
+    fora.push({titulo:a.title, dist:Math.round(a.dist||0), pageid:a.pageid,
+               texto:p.extract||"", fonte:p.fullurl||"",
+               qid:(p.pageprops||{}).wikibase_item});
+    if(fora.length>=3) break;
+  }
+  return {escolhidos:fora,lang,todos};
+}
+async function artigosLocalidade(local,lat,lon,lang){
+  const nomes=[...new Set([local.freguesia,local.concelho,local.distrito].filter(Boolean))];
+  const conc=(local.concelho||"").toLowerCase();
+  const cand=[],ids=new Set();
+  for(const nome of nomes.slice(0,3)){
+    const d=await busca(WIKI(lang)+`generator=search&gsrsearch=${encodeURIComponent(nome)}&gsrlimit=6&prop=extracts%7Cpageprops%7Cinfo%7Ccoordinates&exintro=1&explaintext=1&exlimit=6&inprop=url&ppprop=wikibase_item`);
+    for(const p of (d&&d.query&&d.query.pages)||[]){
+      const co=(p.coordinates||[])[0];
+      if(!co||ids.has(p.pageid)) continue;
+      if(distM(lat,lon,co.lat,co.lon)>60000) continue;
+      const cab=(p.extract||"").slice(0,400).toLowerCase();
+      if(!RE_POVOACAO.test(cab)) continue;
+      let s=(p.extract||"").length/250;
+      if(p.title.toLowerCase()===conc) s+=50;
+      if(/(?:^|\s)é\s+(?:uma?|a|o)\s+(?:cidade|vila|munic[íi]pio)/.test(cab)) s+=25;
+      if(RE_EXTINTA.test(cab)) s-=70;
+      ids.add(p.pageid);
+      cand.push({s,art:{titulo:p.title,pageid:p.pageid,fonte:p.fullurl||"",
+                        qid:(p.pageprops||{}).wikibase_item}});
+    }
+  }
+  return cand.sort((a,b)=>b.s-a.s).filter(c=>c.s>-40).slice(0,2).map(c=>c.art);
+}
+function claim(ent,prop){
+  let melhor=null, quando=null;
+  for(const c of ((ent||{}).claims||{})[prop]||[]){
+    const dv=(((c.mainsnak||{}).datavalue)||{}).value;
+    if(dv==null) continue;
+    const val=typeof dv==="object"?(dv.amount??dv.time??null):dv;
+    let q=null;
+    for(const x of ((c.qualifiers||{}).P585)||[]) q=(((x.datavalue||{}).value)||{}).time||q;
+    if(melhor===null||(q&&(quando===null||q>quando))){melhor=val;quando=q;}
+  }
+  const n=parseFloat(String(melhor||"").replace("+",""));
+  return {v:isNaN(n)?null:n, ano:quando?quando.slice(1,5):null};
+}
+
+/* canais — respeitam as preferências de detalhe */
+async function canalHistoria(f){
+  const n=[1,3,5][S.detalhe.HISTORIA-1];
+  const fora=f.escolhidos.map(e=>({chave:e.titulo, texto:`${e.titulo}. ${frases(e.texto,n)}`}));
+  if(S.extra.gente){
+    const qids=f.base.map(e=>e.qid).filter(Boolean).slice(0,2);
+    if(qids.length){
+      const gente=await filhosDaTerra(qids);
+      if(gente.length){
+        const lista=gente.slice(0,3).map(p=>p.desc?`${p.nome}, ${p.desc}`:p.nome).join("; ");
+        fora.push({chave:`gente:${qids[0]}`, texto:`Desta terra são naturais: ${lista}.`});
+        // fica na memória: se outra terra os mencionar, o companheiro liga as duas
+        gente.forEach(p=>registaEntidade(p.nome, f.local.concelho));
+      }
+    }
+  }
+  return fora;
+}
+const RE_SEC_SABOR=/^(gastronomia|culin[aá]ria|do[çc]aria|festas|festividades|festas e romarias|romarias|tradi[çc][õo]es|artesanato|folclore|cultura popular)/;
+/* o Nominatim nem sempre dá o distrito; os artigos dizem-no quase sempre */
+function distritoDe(f){
+  if(f.local.distrito) return f.local.distrito;
+  for(const e of f.escolhidos){
+    const m=/distrito d[eoa] ([A-ZÀ-Ú][\wçãõáéíóúâê]+(?:[ -][A-ZÀ-Úd][\wçãõáéíóúâê]+)*)/.exec(e.texto||"");
+    if(m) return m[1].replace(/[,.].*$/,"");
+  }
+  return null;
+}
+/* pratos com artigo próprio, organizados por categorias regionais da Wikipédia */
+const CAT_COZINHA={"evora":"Culinária do Alentejo","beja":"Culinária do Alentejo",
+  "portalegre":"Culinária do Alentejo","faro":"Culinária do Algarve",
+  "braga":"Culinária do Minho","viana do castelo":"Culinária do Minho",
+  "vila real":"Culinária de Trás-os-Montes","braganca":"Culinária de Trás-os-Montes",
+  "lisboa":"Culinária da Estremadura","setubal":"Culinária da Estremadura",
+  "leiria":"Culinária da Estremadura"};
+async function pratosRegiao(cat){
+  const d=await busca(WIKI("pt")+`list=categorymembers&cmtitle=${encodeURIComponent("Categoria:"+cat)}&cmlimit=30&cmnamespace=0`);
+  return (((d||{}).query||{}).categorymembers||[]).map(m=>m.title)
+         .filter(t=>!/restaurante|\(empresa\)/i.test(t));
+}
+async function canalSabores(f){
+  const base=f.base.length?f.base:f.escolhidos;
+  const nF=[2,3,5][S.detalhe.SABORES-1];
+  const fora=[];
+  // 1) secções de gastronomia/festas do artigo da própria terra (raro, mas ouro)
+  for(const e of base.slice(0,2)){
+    const pags=await wikiPaginas([e.pageid],f.lang,false);
+    const secs=seccoes((pags[e.pageid]||{}).extract||"");
+    for(const k of Object.keys(secs)){
+      if(RE_SEC_SABOR.test(k)&&secs[k].trim().length>80)
+        fora.push({chave:`sab:${e.titulo}:${k}`,
+                   texto:`${k[0].toUpperCase()+k.slice(1)} de ${e.titulo}. ${frases(secs[k],nF)}`});
+    }
+  }
+  // 2) um prato da região, com o seu artigo próprio
+  if(!fora.length){
+    const cat=CAT_COZINHA[norm(distritoDe(f)||"")];
+    if(cat){
+      for(const t of await pratosRegiao(cat)){
+        const chave=`sab:${t}`;
+        if(S.ditos.has(chave)) continue;
+        const ext=await artigoPorTitulo(t);
+        if(!ext){ marcaDito(chave); continue; }
+        fora.push({chave, texto:`Um sabor desta região: ${t}. ${frases(ext,nF)}`});
+        break;                             // um prato por anúncio chega
+      }
+    }
+  }
+  // 3) a mesa portuguesa em geral (o pão, o azeite, a doçaria…)
+  if(!fora.length){
+    const ext=await artigoPorTitulo("Gastronomia de Portugal");
+    if(ext){
+      const secs=seccoes(ext);
+      for(const k of ["o pão","o azeite","o vinho","sopas e cozidos","enchidos",
+                      "peixe e marisco","doçaria","temperos"]){
+        const chave=`sab:pt:${k}`;
+        if(S.ditos.has(chave)||!(secs[k]||"").trim()) continue;
+        fora.push({chave, texto:`Da mesa portuguesa: ${k}. ${frases(secs[k],nF)}`});
+        break;
+      }
+    }
+  }
+  return fora;
+}
+async function canalDemografia(f){
+  const base=f.base.length?f.base:f.escolhidos;
+  const ents=await wikidata(base.map(e=>e.qid).filter(Boolean).slice(0,3));
+  const fora=[];
+  for(const e of base.slice(0,[1,2,3][S.detalhe.DEMOGRAFIA-1])){
+    const ent=ents[e.qid]; if(!ent) continue;
+    const pop=claim(ent,"P1082"), area=claim(ent,"P2046"), alt=claim(ent,"P2044");
+    const b=[];
+    if(S.demo.populacao&&pop.v) b.push(`${Math.round(pop.v)} habitantes${pop.ano?` nos censos de ${pop.ano}`:""}`);
+    if(S.demo.densidade&&pop.v&&area.v) b.push(`${Math.round(pop.v/area.v)} habitantes por quilómetro quadrado`);
+    if(S.demo.area&&area.v) b.push(`${Math.round(area.v)} quilómetros quadrados de área`);
+    if(S.demo.altitude&&alt.v) b.push(`${Math.round(alt.v)} metros de altitude`);
+    if(b.length) fora.push({chave:`demo:${e.titulo}`, texto:`${e.titulo}: ${b.join("; ")}.`});
+  }
+  return fora;
+}
+async function canalEconomia(f){
+  const base=f.base.length?f.base:f.escolhidos;
+  const nF=[1,3,5][S.detalhe.ECONOMIA-1];
+  const fora=[];
+  for(const e of base.slice(0,2)){
+    const pags=await wikiPaginas([e.pageid],f.lang,false);
+    const txt=(pags[e.pageid]||{}).extract||"";
+    const secs=seccoes(txt);
+    const chaveSec=Object.keys(secs).find(k=>k.startsWith("economia")||k.startsWith("atividade económica")||k.startsWith("actividade económica"));
+    if(chaveSec&&secs[chaveSec].trim().length>80){
+      fora.push({chave:`eco:${e.titulo}`, texto:`${e.titulo}: ${frases(secs[chaveSec],nF)}`});
+      continue;
+    }
+    const fs=txt.replace(/={2,}[^=\n]{0,80}={2,}/g," ").split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/);
+    const bons=fs.filter(x=>x.length>60&&x.length<400&&ECON_FORTE.some(k=>x.toLowerCase().includes(k)))
+                 .filter(x=>!/século|\b1[0-9]{3}\b/.test(x.toLowerCase()));
+    if(bons.length) fora.push({chave:`eco:${e.titulo}`, texto:`${e.titulo}: ${bons.slice(0,Math.max(1,nF-1)).join(" ")}`});
+  }
+  return fora;
+}
+async function canalActualidade(f){
+  const nome=nomeNoticias(f.local)||(f.escolhidos[0]||{}).titulo;
+  if(!nome) return [];
+  const it=await noticias(nome);
+  if(!it.length) return [];
+  const n=[1,2,4][S.detalhe.ACTUALIDADE-1];
+  const escolha=it.slice(0,n);
+  return [{chave:`news:${escolha[0].titulo.slice(0,80)}`,
+           texto:`Notícias de ${nome}: `+escolha.map(x=>x.titulo).join(". ")}];
+}
+async function canalPOI(f,lat,lon){          // só a pé: o que se vê à volta
+  const els=await overpass(lat,lon);
+  const nomes=[...new Set(els.map(e=>((e.tags||{}).name)).filter(Boolean))].slice(0,4);
+  if(!nomes.length) return [];
+  return [{chave:`poi:${nomes[0]}`, texto:`À tua volta: ${nomes.join(", ")}.`}];
+}
+function nomeNoticias(local){
+  for(let n of [local.concelho,local.freguesia,local.distrito]){
+    if(!n) continue;
+    n=n.replace(/\s*\(.*?\)\s*$/,"").replace(/^Uni[aã]o (das|de) [Ff]reguesias de\s+/,"");
+    if(n.includes(" e ")) n=n.split(" e ")[0];
+    n=n.trim(); if(n.length>2) return n;
+  }
+  return "";
+}
+
+const CONSTRUTOR={HISTORIA:canalHistoria, SABORES:canalSabores, ECONOMIA:canalEconomia,
+                  DEMOGRAFIA:canalDemografia, ACTUALIDADE:canalActualidade};
+
+/* a pé: o pormenor da rua e do bairro onde estás AGORA */
+async function detalheRua(lat,lon){
+  if(!S.extra.rua) return null;
+  const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=17&addressdetails=1&accept-language=pt`);
+  const a=(d&&d.address)||{};
+  const rua=a.road, bairro=a.suburb||a.neighbourhood||a.quarter;
+  if(!rua||rua===S.ultimaRua) return null;
+  S.ultimaRua=rua;
+  const chave=`rua:${rua}`;
+  if(S.ditos.has(chave)) return null;
+  marcaDito(chave);
+  let texto=`Estás na ${rua}${bairro?`, no bairro de ${bairro}`:""}.`;
+  // a rua tem artigo próprio? (Rua Augusta, Rua de Santa Catarina…)
+  const w=await busca(WIKI("pt")+`generator=search&gsrsearch=${encodeURIComponent(rua)}&gsrlimit=3&prop=extracts%7Ccoordinates&exintro=1&explaintext=1&exlimit=3`);
+  for(const p of (w&&w.query&&w.query.pages)||[]){
+    const co=(p.coordinates||[])[0];
+    if(!co||distM(lat,lon,co.lat,co.lon)>1500) continue;
+    if(norm(p.title).includes(norm(rua).slice(0,12))){
+      texto+=` ${frases(p.extract,2)}`;
+      marcaDito(p.title);            // o canal história não deve repetir isto
+      break;
+    }
+  }
+  return {chave, texto};
+}
+
+/* sazonalidade: festas e romarias deste mês (ou do próximo) nesta terra */
+async function festasDoMes(f){
+  const base=f.base.length?f.base:f.escolhidos;
+  const hoje=new Date();
+  const mAtual=MESES[hoje.getMonth()], mSeg=MESES[(hoje.getMonth()+1)%12];
+  for(const e of base.slice(0,1)){
+    const chave=`festa:${e.titulo}:${hoje.getMonth()}`;
+    if(S.ditos.has(chave)) continue;
+    const pags=await wikiPaginas([e.pageid],f.lang,false);
+    const secs=seccoes((pags[e.pageid]||{}).extract||"");
+    for(const k of Object.keys(secs)){
+      if(!/fest|romaria|feira|tradi|eventos/.test(k)) continue;
+      const corpo=secs[k].replace(/\s+/g," ");
+      const fs=corpo.split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/)
+        .filter(x=>{const n=norm(x); return n.includes(mAtual)||n.includes(mSeg);});
+      if(fs.length){
+        marcaDito(chave);
+        return {texto:`Festas por estes dias em ${e.titulo}: ${fs.slice(0,2).join(" ")}`};
+      }
+      // as datas raramente estão no artigo da terra — estão no artigo da festa
+      const nomes=[...corpo.matchAll(/(?:Romaria|Festas?|Festival|Feira) (?:d[aeo]s? |de )?[A-ZÀ-Ú][\wÀ-úçãõ'’]*(?: [\wÀ-úçãõd'’]+){0,6}/g)]
+                  .map(m=>m[0].trim());
+      for(const nf of [...new Set(nomes)].slice(0,3)){
+        const ext=await artigoPorTitulo(nf);
+        if(!ext) continue;
+        const dfs=ext.replace(/\s+/g," ").split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/)
+          .filter(x=>{const n=norm(x); return n.includes(mAtual)||n.includes(mSeg);});
+        if(dfs.length){
+          marcaDito(chave);
+          return {texto:`Por estes dias em ${e.titulo}: ${nf}. ${dfs.slice(0,2).join(" ")}`};
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/* efemérides: aconteceu aqui, num dia como o de hoje */
+async function efemeride(f){
+  const hoje=new Date(), dia=hoje.getDate(), mes=norm(MESES[hoje.getMonth()]);
+  const reData=/\b(\d{1,2}) de (janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro) de (\d{4})/i;
+  for(const e of (f.todos&&f.todos.length?f.todos:f.escolhidos)){
+    const txt=e.texto||"";
+    for(const fr of txt.split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/)){
+      const m=reData.exec(fr);
+      if(!m||norm(m[2])!==mes||Math.abs(+m[1]-dia)>3) continue;
+      const anos=hoje.getFullYear()-+m[3];
+      if(anos<1||anos>1200) continue;
+      const chave=`efem:${e.titulo}:${m[0]}`;
+      if(S.ditos.has(chave)) continue;
+      marcaDito(chave);
+      return {texto:`Efeméride: faz agora ${anos} anos. ${fr.trim()}`};
+    }
+  }
+  return null;
+}
+
+/* segurança e presente: avisos IPMA + incêndios ativos */
+async function avisosZona(f,lat,lon){
+  if(!S.extra.avisos) return [];
+  const fora=[];
+  try{
+    for(const a of await avisosIPMA(distritoDe(f))) fora.push(a);
+    for(const x of await fogosPerto(lat,lon)) fora.push(x);
+  }catch(e){ console.warn("avisos:",e); }
+  return fora.filter(a=>!S.ditos.has(a.chave));
+}
+
+/* liga o que vais ouvir ao que já ouviste noutra terra, noutra altura */
+function ligaEntreTerras(it,concelho){
+  for(const nome of Object.keys(M.entidades)){
+    const ent=M.entidades[nome];
+    if(nome===it.chave) continue;                    // não se liga a si próprio
+    if(!ent.onde||ent.onde===concelho) continue;
+    if(Date.now()-ent.quando<30*60e3) continue;      // tem de ser doutra ocasião
+    if(!it.texto.includes(nome)) continue;
+    const d=new Date(ent.quando);
+    return ` Curiosamente, de ${nome} já tinhas ouvido falar quando passaste por ${ent.onde}, em ${MESES[d.getMonth()]}.`;
+  }
+  return "";
+}
+
+async function narrar(f,lat,lon,modo){
+  // o canal escolhido manda; os restantes entram por ordem do interesse aprendido
+  const ordem=[S.canal,
+    ...Object.keys(CONSTRUTOR).filter(c=>c!==S.canal)
+       .sort((a,b)=>(M.pesos[b]||1)-(M.pesos[a]||1))
+  ].filter(c=>S.ativos[c]);
+  const concelho=f.local.concelho||"";
+  for(const c of ordem){
+    let itens=[];
+    try{ itens=await CONSTRUTOR[c](f); }catch(e){ console.warn(c,e); }
+    for(const it of itens){
+      if(S.ditos.has(it.chave)) continue;
+      marcaDito(it.chave);
+      const liga=ligaEntreTerras(it,concelho);
+      if(c==="HISTORIA") registaEntidade(it.chave.startsWith("gente:")?null:it.chave, concelho);
+      const nome=nomeNoticias(f.local)||f.local.linha;
+      const intro=c==="HISTORIA"?`Mais à frente, perto de ${nome}. `:
+                  c==="ECONOMIA"?`Sobre a economia. `:
+                  c==="DEMOGRAFIA"?`Alguns números. `:"";
+      return {canal:c, texto:intro+it.texto+liga};
+    }
+  }
+  if(modo==="pe"){
+    for(const it of await canalPOI(f,lat,lon)){
+      if(S.ditos.has(it.chave)) continue;
+      marcaDito(it.chave);
+      return {canal:"HISTORIA", texto:it.texto};
+    }
+  }
+  return null;
+}
+
+/* ═══════════════════ narrador IA local (WebLLM / WebGPU) ═══════════════════
+   O modelo corre DENTRO do browser do telemóvel — é o "modelo local" do plano:
+   nunca gera factos, só reescreve os que as fontes deram. Se falhar, demorar
+   ou não existir WebGPU, sai o texto original — a app nunca fica pendurada. */
+const MODELO_IA="Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+let motorIA=null, iaEstado="desligado";   // desligado|a carregar|pronto|indisponível
+function pintaIA(msg){ iaEstado=msg; const e=$("#estadoIA"); if(e) e.textContent=msg; }
+async function ligaIA(){
+  if(motorIA) return;
+  if(!navigator.gpu){ pintaIA("indisponível: este browser não tem WebGPU"); $("#chkIA").checked=false; return; }
+  try{
+    pintaIA("a preparar…");
+    const webllm=await import("https://esm.run/@mlc-ai/web-llm");
+    const eng=await webllm.CreateMLCEngine(MODELO_IA,{
+      initProgressCallback:p=>pintaIA(`a descarregar o modelo… ${Math.round((p.progress||0)*100)}%`)
+    });
+    motorIA=eng; pintaIA("pronto — a narração passa pela IA local");
+    regista("cmd","Narrador IA pronto. O modelo corre no teu telemóvel.");
+  }catch(e){
+    console.warn("IA:",e);
+    pintaIA("indisponível: "+String(e.message||e).slice(0,80));
+    $("#chkIA").checked=false;
+  }
+}
+async function narraIA(texto){
+  if(!motorIA||!$("#chkIA").checked) return texto;
+  try{
+    const r=await Promise.race([
+      motorIA.chat.completions.create({
+        messages:[
+          {role:"system",content:"És um companheiro de viagem português. Reescreve o texto do utilizador como narração falada, natural e calorosa, em português de Portugal. Mantém todos os factos, nomes e números exatamente como estão. Não acrescentes informação nova. No máximo 4 frases."},
+          {role:"user",content:texto}],
+        temperature:0.3, max_tokens:220}),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error("tempo esgotado")),30000)),
+    ]);
+    const saida=(r.choices?.[0]?.message?.content||"").trim();
+    return saida.length>30?saida:texto;   // resposta estranha → original
+  }catch(e){ console.warn("narraIA:",e); return texto; }
+}
+
+/* ═══════════════════ voz (síntese) ═══════════════════ */
+let vozEscolhida=null, filaFala=[], aFalar=false, falaCanal=null, falaCancelada=false;
+function escolheVoz(){
+  const vs=speechSynthesis.getVoices();
+  vozEscolhida = vs.find(v=>v.lang.replace("_","-")===S.lingua)
+              || vs.find(v=>v.lang.startsWith(S.lingua.slice(0,2)))
+              || vs[0] || null;
+}
+if("speechSynthesis" in window){
+  speechSynthesis.onvoiceschanged=escolheVoz; escolheVoz();
+}
+function _falaAgora(texto,canal){
+  if(!("speechSynthesis" in window)){aFalar=false;return;}
+  const u=new SpeechSynthesisUtterance(texto);
+  if(vozEscolhida) u.voice=vozEscolhida;
+  u.lang=S.lingua; u.rate=1.0;
+  falaCanal=canal||null; falaCancelada=false;
+  u.onstart=()=>{ pausaOuvido(); };
+  u.onend=u.onerror=()=>{
+    // ouvir até ao fim é o sinal positivo mais honesto que existe
+    if(!falaCancelada&&falaCanal){ reforca(falaCanal,1.04); S.saltos[falaCanal]=0; }
+    aFalar=false; falaCanal=null; retomaOuvido();
+    if(filaFala.length){ aFalar=true; const p=filaFala.shift(); _falaAgora(p.t,p.c); }
+  };
+  aFalar=true; speechSynthesis.speak(u);
+}
+function diz(texto,canal){
+  if(S.silencio||!texto) return;
+  if(aFalar){ filaFala=[{t:texto,c:canal}]; }   // substitui o que envelheceu
+  else _falaAgora(texto,canal);
+}
+function dizJa(texto){                     // confirmações de comandos: imediato
+  if(!texto) return;
+  filaFala=[]; falaCancelada=true;
+  try{speechSynthesis.cancel();}catch(e){}
+  aFalar=false; if(!S.silencio) _falaAgora(texto,null);
+}
+function salta(){
+  // saltar é o sinal negativo: o interesse nesse canal desce
+  if(falaCanal){
+    reforca(falaCanal,0.85);
+    S.saltos[falaCanal]=(S.saltos[falaCanal]||0)+1;
+    if(S.saltos[falaCanal]>=3&&falaCanal===S.canal){
+      const alt=Object.keys(NOMES).filter(c=>S.ativos[c]&&c!==S.canal)
+                .sort((a,b)=>(M.pesos[b]||1)-(M.pesos[a]||1))[0];
+      if(alt){
+        S.saltos[falaCanal]=0; S.canal=alt; guardaPrefs(); pintaCanais();
+        regista("cmd",`Noto que tens saltado ${NOMES[falaCanal]} — passo a dar prioridade a ${NOMES[alt]}.`);
+      }
+    }
+  }
+  filaFala=[]; falaCancelada=true;
+  try{speechSynthesis.cancel();}catch(e){} aFalar=false;
+}
+
+/* ═══════════════════ ouvido (menu falado) ═══════════════════ */
+let rec=null, recDisponivel=false, recPausado=false;
+function iniciaOuvido(){
+  const Rec=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!Rec){recDisponivel=false; return false;}
+  recDisponivel=true;
+  rec=new Rec(); rec.lang=S.lingua; rec.continuous=true; rec.interimResults=false;
+  rec.onresult=ev=>{
+    for(let i=ev.resultIndex;i<ev.results.length;i++)
+      if(ev.results[i].isFinal) comando(ev.results[i][0].transcript);
+  };
+  rec.onend=()=>{ if(S.micAtivo&&!recPausado) setTimeout(()=>{try{rec.start();}catch(e){}},300); };
+  rec.onerror=e=>{ if(e.error==="not-allowed"){S.micAtivo=false; pintaMic();} };
+  try{rec.start(); return true;}catch(e){return false;}
+}
+function pausaOuvido(){ if(rec&&S.micAtivo){recPausado=true; try{rec.abort();}catch(e){}} }
+function retomaOuvido(){ if(rec&&S.micAtivo){recPausado=false; setTimeout(()=>{try{rec.start();}catch(e){}},250);} }
+
+const COMANDOS=[
+  [/historia/,               ()=>mudaCanal("HISTORIA")],
+  [/gastronomia|sabores|comida|tradicoes|festas/, ()=>mudaCanal("SABORES")],
+  [/economia/,               ()=>mudaCanal("ECONOMIA")],
+  [/demografia|estatistic|numeros/, ()=>mudaCanal("DEMOGRAFIA")],
+  [/atualidade|noticias/,    ()=>mudaCanal("ACTUALIDADE")],
+  [/silencio|cala/,          ()=>{S.silencio=true; salta(); pintaSom(); regista("cmd","Silêncio ligado.");}],
+  [/\bfala\b|continua|\bsom\b/, ()=>{S.silencio=false; pintaSom(); dizJa("Estou de volta.");}],
+  [/mais detalhe/,           ()=>{S.detalhe[S.canal]=Math.min(3,S.detalhe[S.canal]+1); guardaPrefs(); pintaDefs(); dizJa(`Mais detalhe em ${NOMES[S.canal]}.`);}],
+  [/menos detalhe/,          ()=>{S.detalhe[S.canal]=Math.max(1,S.detalhe[S.canal]-1); guardaPrefs(); pintaDefs(); dizJa(`Menos detalhe em ${NOMES[S.canal]}.`);}],
+  [/sem densidade/,          ()=>afinaDemo("densidade",false,"Deixo de dizer a densidade populacional.")],
+  [/com densidade/,          ()=>afinaDemo("densidade",true,"Volto a dizer a densidade populacional.")],
+  [/sem populacao/,          ()=>afinaDemo("populacao",false,"Deixo de dizer a população.")],
+  [/com populacao/,          ()=>afinaDemo("populacao",true,"Volto a dizer a população.")],
+  [/sem area/,               ()=>afinaDemo("area",false,"Deixo de dizer a área.")],
+  [/com area/,               ()=>afinaDemo("area",true,"Volto a dizer a área.")],
+  [/sem altitude/,           ()=>afinaDemo("altitude",false,"Deixo de dizer a altitude.")],
+  [/com altitude/,           ()=>afinaDemo("altitude",true,"Volto a dizer a altitude.")],
+  [/esquece (a )?memoria/,   ()=>{$("#bEsquece").click(); dizJa("Esqueci tudo o que sabia de ti.");}],
+  [/salta|proximo|passa/,    ()=>{salta(); regista("cmd","Saltado.");}],
+  [/repete/,                 ()=>{if(S.ultimoTexto) dizJa(S.ultimoTexto);}],
+  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, ou repete.")],
+];
+function comando(dito){
+  const d=norm(dito);
+  for(const [re,fn] of COMANDOS)
+    if(re.test(d)){ regista("cmd",`🎙 «${dito.trim()}»`); fn(); return; }
+}
+function afinaDemo(chave,valor,resposta){
+  S.demo[chave]=valor; guardaPrefs(); pintaDefs(); dizJa(resposta);
+}
+function mudaCanal(c){
+  S.canal=c; guardaPrefs(); pintaCanais();
+  dizJa(`Canal ${NOMES[c]}.`);
+  S.ultimoAnuncioD=-1e12;                  // conta já algo do novo canal
+}
+
+/* ═══════════════════ companheiro (a lógica central) ═══════════════════ */
+function modoAtual(){ return S.veloc>3?"carro":"pe"; }
+function horizonte(){ return modoAtual()==="carro"?240:60; }
+function passo(){ return modoAtual()==="carro"?4000:250; }
+
+async function novaPosicao(lat,lon,tMs,velGps){
+  const u=S.ultimaPos;
+  if(u){
+    const d=distM(u.lat,u.lon,lat,lon), dt=(tMs-u.t)/1000;
+    if(dt>0){
+      const vInst=velGps!=null&&!isNaN(velGps)?velGps:d/dt;
+      S.veloc=S.veloc*0.7+vInst*0.3;
+    }
+    if(d>5) S.rumo=rumoG(u.lat,u.lon,lat,lon);
+    S.dAcum+=d;
+  }
+  S.ultimaPos={lat,lon,t:tMs};
+  pintaEstado();
+  if(!S.anunciando && S.dAcum-S.ultimoAnuncioD>=passo()) anunciar(lat,lon);
+}
+async function anunciar(lat,lon){
+  S.anunciando=true;
+  try{
+    const modo=modoAtual(), ahead=S.veloc*horizonte();
+    let pla=lat, plo=lon;
+    if(ahead>150&&S.rumo!=null) [pla,plo]=avanca(lat,lon,S.rumo,ahead);
+    const local=await nominatim(pla,plo);
+    const {escolhidos,lang,todos}=await escolher(pla,plo,modo);
+    const base=await artigosLocalidade(local,pla,plo,lang);
+    const f={local,escolhidos,base,lang,todos:todos||[]};
+    $("#chipLocal").textContent=local.linha;
+
+    let pre="";
+    if(local.concelho&&local.concelho!==S.ultimoConcelho){
+      pre=S.ultimoConcelho?`Estamos a chegar ao concelho de ${local.concelho}. `
+                          :`Estás perto de ${local.linha}. `;
+      pre+=saudacaoRegresso(local.concelho);      // "já por aqui passaste em…"
+      S.ultimoConcelho=local.concelho;
+    }
+    // 1.º os avisos (IPMA, incêndios) — segurança fala antes de tudo
+    for(const av of await avisosZona(f,lat,lon)){
+      marcaDito(av.chave);
+      const t=paraVoz(av.texto);
+      regista("ACTUALIDADE","⚠️ "+t); diz(t,null);
+    }
+    // sazonalidade e efemérides: o presente e o calendário desta terra
+    try{
+      const fe=await festasDoMes(f);
+      if(fe){ const t=paraVoz(fe.texto); regista("SABORES","🎉 "+t); diz(t,"SABORES"); }
+      const ef=await efemeride(f);
+      if(ef){ const t=paraVoz(ef.texto); regista("HISTORIA","📅 "+t); diz(t,"HISTORIA"); }
+    }catch(e){ console.warn("calendário:",e); }
+    // a pé, o pormenor da rua onde estás agora
+    if(modo==="pe"){
+      const r=await detalheRua(lat,lon);
+      if(r){ pre+=r.texto+" "; }
+    }
+    const n=await narrar(f,pla,plo,modo);
+    if(n||pre){
+      let txt=paraVoz(pre+((n&&n.texto)||""));
+      txt=paraVoz(await narraIA(txt));    // IA local reescreve; se falhar, fica igual
+      regista((n&&n.canal)||"LOCAL",txt);
+      S.ultimoTexto=txt; diz(txt,(n&&n.canal)||null);
+    }
+  }catch(e){ console.warn("anúncio falhou:",e); }
+  finally{ S.ultimoAnuncioD=S.dAcum; S.anunciando=false; }
+}
+
+/* ═══════════════════ posição: GPS real ou simulação ═══════════════════ */
+const ROTAS={
+  "a1":{v:25,p:[[38.7700,-9.1000],[39.0300,-8.8400],[39.2400,-8.6900],[39.7400,-8.8100],[40.2100,-8.4300],[40.6400,-8.6300],[41.1300,-8.6100]]},
+  "alentejo":{v:25,p:[[38.4430,-7.3810],[38.5700,-7.9070],[38.2400,-7.5400],[37.9600,-7.9800],[38.1100,-7.1600]]},
+  "douro":{v:25,p:[[41.1600,-7.7900],[41.1900,-7.5400],[41.2400,-7.4200]]},
+  "baixa-lisboa":{v:1.4,p:[[38.7075,-9.1364],[38.7104,-9.1385],[38.7139,-9.1394],[38.7098,-9.1330],[38.7139,-9.1335]]},
+};
+function iniciaGPS(){
+  if(!navigator.geolocation){regista("cmd","Este browser não tem geolocalização."); return;}
+  navigator.geolocation.watchPosition(
+    p=>novaPosicao(p.coords.latitude,p.coords.longitude,p.timestamp,p.coords.speed),
+    e=>regista("cmd",`GPS indisponível: ${e.message}. Podes usar a simulação.`),
+    {enableHighAccuracy:true, maximumAge:2000, timeout:15000});
+}
+function iniciaSim(nomeRota,turbo){
+  const r=ROTAS[nomeRota];
+  const acum=[0];
+  for(let i=1;i<r.p.length;i++) acum.push(acum[i-1]+distM(...r.p[i-1],...r.p[i]));
+  const total=acum[acum.length-1];
+  let d=0, tSim=Date.now();
+  const passoReal=600;
+  const timer=setInterval(()=>{
+    if(d>=total){clearInterval(timer); regista("cmd","Fim do percurso simulado."); return;}
+    let i=acum.findIndex(a=>a>d); if(i<1) i=acum.length-1;
+    const f=(d-acum[i-1])/((acum[i]-acum[i-1])||1);
+    const lat=r.p[i-1][0]+(r.p[i][0]-r.p[i-1][0])*f;
+    const lon=r.p[i-1][1]+(r.p[i][1]-r.p[i-1][1])*f;
+    tSim+=passoReal*turbo;                 // o relógio simulado anda turbo× mais depressa
+    novaPosicao(lat,lon,tSim,r.v);
+    d+=r.v*(passoReal/1000)*turbo;
+  },passoReal);
+}
+
+/* ═══════════════════ interface ═══════════════════ */
+function regista(tag,texto){
+  const e=document.createElement("div");
+  e.className="e"+(tag==="cmd"?" cmd":"");
+  const nome=tag==="cmd"?"":(NOMES[tag]||tag).toUpperCase();
+  e.innerHTML=(nome?`<span class="tag">${nome}</span>`:"")+`<p></p>`;
+  e.querySelector("p").textContent=texto;
+  $("#log").prepend(e);
+  while($("#log").children.length>60) $("#log").lastChild.remove();
+}
+function pintaCanais(){
+  document.querySelectorAll("[data-canal]").forEach(b=>
+    b.classList.toggle("on",b.dataset.canal===S.canal));
+  $("#chipCanal").innerHTML=`canal <b>${NOMES[S.canal]}</b>`;
+}
+function pintaSom(){ $("#bSom").textContent=S.silencio?"🔇":"🔊"; $("#bSom").classList.toggle("alerta",S.silencio); }
+function pintaMic(){ $("#bMic").classList.toggle("on",S.micAtivo); $("#chipMic").hidden=!S.micAtivo; }
+function pintaEstado(){
+  $("#chipModo").innerHTML=`<b>${modoAtual()==="carro"?"🚗 carro":"🚶 a pé"}</b>`;
+  $("#chipVel").innerHTML=`<b>${Math.round(S.veloc*3.6)}</b> km/h`;
+}
+function pintaDefs(){
+  document.querySelectorAll("[data-ativo]").forEach(x=>x.checked=S.ativos[x.dataset.ativo]);
+  document.querySelectorAll("[data-detalhe]").forEach(x=>x.value=S.detalhe[x.dataset.detalhe]);
+  document.querySelectorAll("[data-demo]").forEach(x=>x.checked=S.demo[x.dataset.demo]);
+  document.querySelectorAll("[data-extra]").forEach(x=>x.checked=S.extra[x.dataset.extra]);
+  $("#selLingua").value=S.lingua;
+  // perfil aprendido: pesos em percentagem + resumo das viagens memorizadas
+  const soma=Object.keys(NOMES).reduce((a,c)=>a+(M.pesos[c]||1),0);
+  $("#perfilPesos").innerHTML=Object.keys(NOMES).map(c=>{
+    const pct=Math.round(100*(M.pesos[c]||1)/soma);
+    const barra="█".repeat(Math.max(1,Math.round(pct/6)));
+    return `${NOMES[c].padEnd(9)} <span style="color:var(--acento)">${barra}</span> ${pct}%`;
+  }).join("<br>");
+  const nV=Object.keys(M.visitas).length, nF=Object.keys(M.ditos).length;
+  $("#perfilViagens").textContent=nV?`Memória: ${nV} concelhos visitados, ${nF} factos já contados.`:"Ainda sem viagens memorizadas.";
+}
+
+document.querySelectorAll("[data-canal]").forEach(b=>
+  b.onclick=()=>{S.ativos[b.dataset.canal]=true; mudaCanal(b.dataset.canal);});
+$("#bSalta").onclick=()=>{salta(); regista("cmd","Saltado.");};
+$("#bSom").onclick=()=>{S.silencio=!S.silencio; if(S.silencio) salta(); pintaSom();};
+$("#bMic").onclick=()=>{
+  if(!recDisponivel){regista("cmd","Reconhecimento de voz indisponível neste browser."); return;}
+  S.micAtivo=!S.micAtivo;
+  if(S.micAtivo) iniciaOuvido(); else try{rec.abort();}catch(e){}
+  pintaMic();
+};
+$("#bDefs").onclick=()=>{pintaDefs(); $("#defs").classList.add("aberto");};
+$("#bFechaDefs").onclick=()=>$("#defs").classList.remove("aberto");
+$("#chkIA").onchange=e=>{
+  if(e.target.checked){
+    if(confirm("O modelo de IA (~1 GB) vai ser descarregado uma única vez para o telemóvel. Fazer agora? (recomendado em Wi-Fi)")) ligaIA();
+    else e.target.checked=false;
+  } else pintaIA("desligado");
+};
+$("#bEsquece").onclick=()=>{
+  M={ditos:{}, visitas:{}, entidades:{}, pesos:{}};
+  S.ditos.clear(); localStorage.removeItem("cv-mem");
+  pintaDefs(); regista("cmd","Memória de viagens e interesses esquecida.");
+};
+$("#defs").onclick=e=>{if(e.target.id==="defs") $("#defs").classList.remove("aberto");};
+document.querySelectorAll("[data-ativo]").forEach(x=>
+  x.onchange=()=>{S.ativos[x.dataset.ativo]=x.checked; guardaPrefs();});
+document.querySelectorAll("[data-detalhe]").forEach(x=>
+  x.onchange=()=>{S.detalhe[x.dataset.detalhe]=+x.value; guardaPrefs();});
+document.querySelectorAll("[data-demo]").forEach(x=>
+  x.onchange=()=>{S.demo[x.dataset.demo]=x.checked; guardaPrefs();});
+document.querySelectorAll("[data-extra]").forEach(x=>
+  x.onchange=()=>{S.extra[x.dataset.extra]=x.checked; guardaPrefs();});
+$("#selLingua").onchange=e=>{S.lingua=e.target.value; escolheVoz(); if(rec) rec.lang=S.lingua; guardaPrefs();};
+$("#selFonte").onchange=e=>{
+  const sim=e.target.value==="sim";
+  $("#linhaRota").hidden=!sim; $("#linhaTurbo").hidden=!sim;
+};
+
+$("#ligar").onclick=async()=>{
+  lePrefs(); pintaCanais(); pintaSom(); pintaDefs();
+  $("#arranque").style.display="none";
+  try{ if(navigator.wakeLock) await navigator.wakeLock.request("screen"); }catch(e){}
+  dizJa("Companheiro ligado.");
+  S.micAtivo=iniciaOuvido(); pintaMic();
+  if(!recDisponivel) regista("cmd","Menu falado indisponível neste browser — usa os botões.");
+  if($("#selFonte").value==="sim")
+    iniciaSim($("#selRota").value, +$("#selTurbo").value);
+  else iniciaGPS();
+};
+const RecTest=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!RecTest) $("#avisoRec").textContent="Nota: o menu falado precisa de Chrome no Android; noutros browsers usa os botões.";
+</script>
+</body>
+</html>
