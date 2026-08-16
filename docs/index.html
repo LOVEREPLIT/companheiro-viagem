@@ -377,9 +377,33 @@ async function avisosIPMA(distrito){
               texto:`Aviso ${NIVEL[a.awarenessLevelID]||a.awarenessLevelID} de ${a.awarenessTypeName} para o distrito de ${distrito}, válido até às ${parseInt(a.endTime.slice(11,13))} horas de dia ${parseInt(a.endTime.slice(8,10))}.`}));
 }
 /* Fogos.pt: incêndios ativos perto de nós */
+/* corsproxy.io tem andado a devolver 503 (bloqueado pela Google) — tenta
+   vários intermediários gratuitos por ordem, fica com o primeiro que responda */
+async function textoViaProxy(urlAlvo){
+  const proxies=[
+    u=>`https://r.jina.ai/${u}`,
+    u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  ];
+  for(const faz of proxies){
+    try{
+      const t=await busca(faz(urlAlvo),"texto");
+      if(t&&t.length>200) return t;
+    }catch(e){}
+  }
+  return null;
+}
+async function jsonViaProxy(urlAlvo){
+  const t=await textoViaProxy(urlAlvo);
+  if(!t) return null;
+  // o r.jina.ai embrulha tudo num cabeçalho de "leitura"; o JSON vem depois
+  const marca="Markdown Content:\n";
+  const i=t.indexOf(marca);
+  const corpo=i>=0?t.slice(i+marca.length):t;
+  try{ return JSON.parse(corpo.trim()); }catch(e){ return null; }
+}
 async function fogosPerto(lat,lon){
-  // a API do fogos.pt não aceita pedidos de outros sítios; vai pelo proxy
-  const d=await busca(`https://corsproxy.io/?url=${encodeURIComponent("https://api.fogos.pt/new/fires")}`);
+  const d=await jsonViaProxy("https://api.fogos.pt/new/fires");
   if(!d||!d.success) return [];
   return (d.data||[])
     .map(f=>({f, km:distM(lat,lon,parseFloat(f.lat),parseFloat(f.lng))/1000}))
@@ -411,17 +435,46 @@ async function artigoPorTitulo(titulo,lang="pt"){
   const p=((d&&d.query&&d.query.pages)||[])[0];
   return (p&&!p.missing&&p.extract)||null;
 }
-async function noticias(nome){
-  const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(`"${nome}" when:120d`)}&hl=pt-PT&gl=PT&ceid=PT:pt-150`;
-  const txt=await busca(`https://corsproxy.io/?url=${encodeURIComponent(rss)}`,"texto");
-  if(!txt) return [];
+/* o r.jina.ai devolve o feed já convertido em Markdown, não XML — cada
+   notícia aparece 2 vezes; a 2.ª ocorrência dá o título limpo (sem o
+   " - Fonte" colado) seguido, sem espaço, do nome da fonte */
+function parseNoticiasMarkdown(txt){
+  const re=/(?<!### )\[([^\]]+)\]\((https:\/\/news\.google\.com\/rss\/articles\/[^)]+)\)([^\n]+)/g;
+  const fora=[]; let m;
+  while((m=re.exec(txt))!==null) fora.push({titulo:m[1].trim(), link:m[2], fonte:m[3].trim()});
+  return fora;
+}
+function parseNoticiasXML(txt){
   try{
     const doc=new DOMParser().parseFromString(txt,"text/xml");
-    return [...doc.querySelectorAll("item")].slice(0,4).map(i=>({
-      titulo:(i.querySelector("title")||{}).textContent||"",
-      fonte:(i.querySelector("source")||{}).textContent||"",
-    }));
+    if(doc.querySelector("parsererror")) return [];
+    return [...doc.querySelectorAll("item")].map(i=>{
+      let titulo=(i.querySelector("title")||{}).textContent||"";
+      const fonte=(i.querySelector("source")||{}).textContent||"";
+      if(fonte&&titulo.endsWith(" - "+fonte)) titulo=titulo.slice(0,-(fonte.length+3));
+      return {titulo, fonte};
+    });
   }catch(e){ return []; }
+}
+async function noticiasPara(nome){
+  const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(`"${nome}" when:120d`)}&hl=pt-PT&gl=PT&ceid=PT:pt-150`;
+  let t=await busca(`https://r.jina.ai/${rss}`,"texto");
+  if(t&&t.length>200){ const it=parseNoticiasMarkdown(t); if(it.length) return it; }
+  t=await busca(`https://corsproxy.io/?url=${encodeURIComponent(rss)}`,"texto");
+  if(t){ const it=parseNoticiasXML(t); if(it.length) return it; }
+  t=await busca(`https://api.allorigins.win/raw?url=${encodeURIComponent(rss)}`,"texto");
+  if(t){ const it=parseNoticiasXML(t); if(it.length) return it; }
+  return [];
+}
+/* notícias a sério locais: tenta a freguesia primeiro (mais próxima de ti);
+   se estiver deserta de cobertura, sobe ao concelho e depois ao distrito —
+   nunca fica muda só porque a povoação é pequena */
+async function noticias(local){
+  for(const nome of candidatosLocalidade(local)){
+    const it=await noticiasPara(nome);
+    if(it.length) return it.slice(0,4);
+  }
+  return [];
 }
 
 /* ═══════════════════ motor de factos (porta de factos.py) ═══════════════════ */
@@ -653,7 +706,7 @@ async function canalEconomia(f){
 async function canalActualidade(f){
   const nome=nomeNoticias(f.local)||(f.escolhidos[0]||{}).titulo;
   if(!nome) return [];
-  const it=await noticias(nome);
+  const it=await noticias(f.local);
   if(!it.length) return [];
   const n=[1,2,4][S.detalhe.ACTUALIDADE-1];
   const escolha=it.slice(0,n);
@@ -666,14 +719,30 @@ async function canalPOI(f,lat,lon){          // só a pé: o que se vê à volta
   if(!nomes.length) return [];
   return [{chave:`poi:${nomes[0]}`, texto:`À tua volta: ${nomes.join(", ")}.`}];
 }
+function limpaNomeLocal(n){
+  n=n.replace(/\s*\(.*?\)\s*$/,"").replace(/^Uni[aã]o (das|de) [Ff]reguesias de\s+/i,"");
+  if(n.includes(" e ")) n=n.split(" e ")[0];
+  return n.trim();
+}
 function nomeNoticias(local){
-  for(let n of [local.concelho,local.freguesia,local.distrito]){
+  for(const n of [local.concelho,local.freguesia,local.distrito]){
     if(!n) continue;
-    n=n.replace(/\s*\(.*?\)\s*$/,"").replace(/^Uni[aã]o (das|de) [Ff]reguesias de\s+/,"");
-    if(n.includes(" e ")) n=n.split(" e ")[0];
-    n=n.trim(); if(n.length>2) return n;
+    const x=limpaNomeLocal(n);
+    if(x.length>2) return x;
   }
   return "";
+}
+/* para a PESQUISA de notícias a ordem inverte-se: começa na freguesia
+   (mais local possível) e só sobe ao concelho/distrito se ali não houver
+   cobertura — é o que torna as notícias realmente locais, não genéricas */
+function candidatosLocalidade(local){
+  const fora=[];
+  for(const n of [local.freguesia,local.concelho,local.distrito]){
+    if(!n) continue;
+    const x=limpaNomeLocal(n);
+    if(x.length>2 && !fora.includes(x)) fora.push(x);
+  }
+  return fora;
 }
 
 const CONSTRUTOR={HISTORIA:canalHistoria, SABORES:canalSabores, ECONOMIA:canalEconomia,
