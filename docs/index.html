@@ -443,12 +443,35 @@ function pontua(art,pag,modo){
   if(RE_EXTINTA.test(cab)) s-=55;
   return s;
 }
+/* se um artigo só existe em inglês, tenta encontrar o equivalente em
+   português antes de o dar como perdido — evita ler "Telheiras Station"
+   quando existe "Estação de Telheiras" */
+async function linkParaPT(tituloEN){
+  const d=await busca(`https://en.wikipedia.org/w/api.php?origin=*&format=json&formatversion=2&action=query&prop=langlinks&lllang=pt&titles=${encodeURIComponent(tituloEN)}&redirects=1`);
+  const p=((d&&d.query&&d.query.pages)||[])[0];
+  const ll=(p&&p.langlinks&&p.langlinks[0]);
+  return ll?ll.title:null;
+}
+async function traduzParaPT(item){
+  try{
+    const tPT=await linkParaPT(item.titulo);
+    if(!tPT) return item;
+    const ext=await artigoPorTitulo(tPT,"pt");
+    if(!ext) return item;
+    return {...item, titulo:tPT, texto:ext, lang:"pt",
+            fonte:`https://pt.wikipedia.org/wiki/${encodeURIComponent(tPT.replace(/ /g,"_"))}`};
+  }catch(e){ console.warn("traduzir:",e); return item; }
+}
+
 async function escolher(lat,lon,modo){
   const raio=modo==="carro"?9000:700;
+  // só recua para inglês se o português não encontrou mesmo NADA por perto —
+  // uma rua sossegada com 1 artigo em português continua em português
   let lang="pt", arts=await wikiGeo(lat,lon,"pt",raio);
-  if(arts.length<2){
+  let usouEN=false;
+  if(!arts.length){
     const alt=await wikiGeo(lat,lon,"en",raio);
-    if(alt.length>arts.length){arts=alt;lang="en";}
+    if(alt.length){arts=alt;lang="en";usouEN=true;}
   }
   if(!arts.length) return {escolhidos:[],lang,todos:[]};
   const pags=await wikiPaginas(arts.map(a=>a.pageid),lang);
@@ -463,10 +486,12 @@ async function escolher(lat,lon,modo){
     vistos.push(t);
     fora.push({titulo:a.title, dist:Math.round(a.dist||0), pageid:a.pageid,
                texto:p.extract||"", fonte:p.fullurl||"",
-               qid:(p.pageprops||{}).wikibase_item});
+               qid:(p.pageprops||{}).wikibase_item, lang});
     if(fora.length>=3) break;
   }
-  return {escolhidos:fora,lang,todos};
+  let escolhidos=fora;
+  if(usouEN) escolhidos=await Promise.all(fora.map(traduzParaPT));
+  return {escolhidos,lang,todos};
 }
 async function artigosLocalidade(local,lat,lon,lang){
   const nomes=[...new Set([local.freguesia,local.concelho,local.distrito].filter(Boolean))];
@@ -551,7 +576,7 @@ async function canalSabores(f){
   const fora=[];
   // 1) secções de gastronomia/festas do artigo da própria terra (raro, mas ouro)
   for(const e of base.slice(0,2)){
-    const pags=await wikiPaginas([e.pageid],f.lang,false);
+    const pags=await wikiPaginas([e.pageid],e.lang||"pt",false);
     const secs=seccoes((pags[e.pageid]||{}).extract||"");
     for(const k of Object.keys(secs)){
       if(RE_SEC_SABOR.test(k)&&secs[k].trim().length>80)
@@ -610,7 +635,7 @@ async function canalEconomia(f){
   const nF=[1,3,5][S.detalhe.ECONOMIA-1];
   const fora=[];
   for(const e of base.slice(0,2)){
-    const pags=await wikiPaginas([e.pageid],f.lang,false);
+    const pags=await wikiPaginas([e.pageid],e.lang||"pt",false);
     const txt=(pags[e.pageid]||{}).extract||"";
     const secs=seccoes(txt);
     const chaveSec=Object.keys(secs).find(k=>k.startsWith("economia")||k.startsWith("atividade económica")||k.startsWith("actividade económica"));
@@ -688,7 +713,7 @@ async function festasDoMes(f){
   for(const e of base.slice(0,1)){
     const chave=`festa:${e.titulo}:${hoje.getMonth()}`;
     if(S.ditos.has(chave)) continue;
-    const pags=await wikiPaginas([e.pageid],f.lang,false);
+    const pags=await wikiPaginas([e.pageid],e.lang||"pt",false);
     const secs=seccoes((pags[e.pageid]||{}).extract||"");
     for(const k of Object.keys(secs)){
       if(!/fest|romaria|feira|tradi|eventos/.test(k)) continue;
@@ -972,8 +997,10 @@ async function anunciar(lat,lon){
     if(ahead>150&&S.rumo!=null) [pla,plo]=avanca(lat,lon,S.rumo,ahead);
     const local=await nominatim(pla,plo);
     const {escolhidos,lang,todos}=await escolher(pla,plo,modo);
-    const base=await artigosLocalidade(local,pla,plo,lang);
-    const f={local,escolhidos,base,lang,todos:todos||[]};
+    // a freguesia/concelho tem quase sempre artigo em português — não
+    // herda a língua da pesquisa (por vezes inglesa) do monumento vizinho
+    const base=await artigosLocalidade(local,pla,plo,"pt");
+    const f={local,escolhidos,base,lang:"pt",todos:todos||[]};
     $("#chipLocal").textContent=local.linha;
 
     let pre="";
