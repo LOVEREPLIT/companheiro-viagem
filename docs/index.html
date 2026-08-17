@@ -639,7 +639,9 @@ async function canalSabores(f){
   }
   // 2) um prato da região, com o seu artigo próprio
   if(!fora.length){
-    const cat=CAT_COZINHA[norm(distritoDe(f)||"")];
+    // o Nominatim raramente dá "distrito" para cidades-sede (ex: Lisboa) —
+    // nesses casos o nome do concelho já É o nome do distrito
+    const cat=CAT_COZINHA[norm(distritoDe(f)||"")]||CAT_COZINHA[norm(f.local.concelho||"")];
     if(cat){
       for(const t of await pratosRegiao(cat)){
         const chave=`sab:${t}`;
@@ -748,6 +750,52 @@ function candidatosLocalidade(local){
 const CONSTRUTOR={HISTORIA:canalHistoria, SABORES:canalSabores, ECONOMIA:canalEconomia,
                   DEMOGRAFIA:canalDemografia, ACTUALIDADE:canalActualidade};
 
+/* muitas ruas portuguesas homenageiam alguém: "Rua Professor Aires de
+   Sousa" → a pessoa é "Aires de Sousa". Descasca o tipo de via e os
+   títulos honoríficos até sobrar (ou não) um nome plausível. */
+const TIPO_VIA=/^(rua|avenida|av\.?|pra[çc]a|largo|travessa|beco|alameda|cal[çc]ada|estrada|rotunda|jardim|parque|azinhaga|caminho)\s+(d[eoa]s?\s+)?/i;
+// títulos "mantidos" (Padre Cruz, Dom Dinis, São Domingos) costumam ser
+// como a Wikipédia conhece a pessoa — os outros são só tratamento formal
+// e desaparecem do título do artigo ("Professor Aires de Sousa" → só "Aires de Sousa")
+const TITULO_MANTIDO=/^(padre|d(om|\.)|s[ãa]o|santa|santo|frei|monsenhor)\s+/i;
+const HONORIFICO=/^(professor(a)?|doutor(a)?|dr\.?|dra\.?|engenheiro|eng\.?|general|padre|c[oó]nego|comandante|capit[ãa]o|coronel|marechal|major|tenente|almirante|dom|d\.|infante|infanta|rainha|rei|s[ãa]o|santa|santo|arquitecto|arquiteto|escritor|poeta|conselheiro|visconde|conde|marqu[eê]s|bar[ãa]o|monsenhor)\s+/i;
+const CONECTORES=new Set(["de","da","do","dos","das","e"]);
+function candidatosPessoaDaRua(rua){
+  const base=rua.replace(TIPO_VIA,"").trim();
+  const tituloMantido=TITULO_MANTIDO.test(base);
+  let n=base, anterior, teveHonorifico=false;
+  do{
+    anterior=n;
+    n=n.replace(HONORIFICO,()=>{teveHonorifico=true; return "";}).trim();
+  }while(n!==anterior);
+  const palavras=n.split(/\s+/).filter(Boolean);
+  const minimo=teveHonorifico?1:2;
+  if(!palavras.length||palavras.length<minimo||palavras.length>5) return [];
+  if(!palavras.every(p=>/^[A-ZÀ-Ú]/.test(p)||CONECTORES.has(p.toLowerCase()))) return [];
+  // "Padre Cruz" tenta-se primeiro com o título; "Professor Aires de Sousa" só sem
+  return tituloMantido?[base,n]:[n];
+}
+/* confirma via Wikidata (P31=Q5, "ser humano") antes de contar a história
+   de alguém — evita apanhar um lugar ou instituição com nome parecido */
+async function pessoaPorNome(nome){
+  const d=await busca(WIKI("pt")+`generator=search&gsrsearch=${encodeURIComponent(nome)}&gsrlimit=8&prop=extracts%7Cpageprops&exintro=1&explaintext=1&exlimit=8&ppprop=wikibase_item`);
+  let pags=((d&&d.query&&d.query.pages)||[]);
+  if(!pags.length) return null;
+  // a relevância da pesquisa pode preferir alguém mais "famoso" a quem
+  // corresponde mesmo ao nome (deu "Padre Pio" em vez de "Padre Cruz") —
+  // um título que contenha o nome procurado ganha sempre prioridade
+  const alvo=norm(nome);
+  pags=[...pags].sort((a,b)=>(norm(a.title).includes(alvo)?0:1)-(norm(b.title).includes(alvo)?0:1));
+  for(const p of pags){
+    const qid=(p.pageprops||{}).wikibase_item;
+    if(!qid||!p.extract) continue;
+    const ent=(await wikidata([qid]))[qid];
+    const tipos=(((ent||{}).claims||{}).P31||[]).map(c=>(((c.mainsnak||{}).datavalue||{}).value||{}).id);
+    if(tipos.includes("Q5")) return {titulo:p.title, texto:p.extract, qid};
+  }
+  return null;
+}
+
 /* a pé: o pormenor da rua e do bairro onde estás AGORA */
 async function detalheRua(lat,lon){
   if(!S.extra.rua) return null;
@@ -760,7 +808,20 @@ async function detalheRua(lat,lon){
   if(S.ditos.has(chave)) return null;
   marcaDito(chave);
   let texto=`Estás na ${rua}${bairro?`, no bairro de ${bairro}`:""}.`;
-  // a rua tem artigo próprio? (Rua Augusta, Rua de Santa Catarina…)
+
+  // 1) a rua tem nome de pessoa? é o pormenor que mais vale a pena contar
+  try{
+    for(const candidato of candidatosPessoaDaRua(rua)){
+      const pessoa=await pessoaPorNome(candidato);
+      if(pessoa){
+        texto+=` A rua deve o nome a ${pessoa.titulo}. ${frases(pessoa.texto,3)}`;
+        marcaDito(`pessoa:${pessoa.titulo}`);
+        registaEntidade(pessoa.titulo, bairro||S.ultimoConcelho);
+        return {chave, texto};
+      }
+    }
+  }catch(e){ console.warn("pessoa da rua:",e); }
+  // 2) senão, a própria rua tem artigo? (Rua Augusta, Rua de Santa Catarina…)
   const w=await busca(WIKI("pt")+`generator=search&gsrsearch=${encodeURIComponent(rua)}&gsrlimit=3&prop=extracts%7Ccoordinates&exintro=1&explaintext=1&exlimit=3`);
   for(const p of (w&&w.query&&w.query.pages)||[]){
     const co=(p.coordinates||[])[0];
@@ -872,9 +933,13 @@ async function narrar(f,lat,lon,modo){
       const liga=ligaEntreTerras(it,concelho);
       if(c==="HISTORIA") registaEntidade(it.chave.startsWith("gente:")?null:it.chave, concelho);
       const nome=nomeNoticias(f.local)||f.local.linha;
-      const intro=c==="HISTORIA"?`Mais à frente, perto de ${nome}. `:
-                  c==="ECONOMIA"?`Sobre a economia. `:
-                  c==="DEMOGRAFIA"?`Alguns números. `:"";
+      let intro=c==="HISTORIA"?`Mais à frente, perto de ${nome}. `:
+                c==="ECONOMIA"?`Sobre a economia. `:
+                c==="DEMOGRAFIA"?`Alguns números. `:"";
+      // se o canal escolhido não tinha mais novidades, di-lo — nunca trocar
+      // de assunto em silêncio (foi o que confundiu sabores com história)
+      if(c!==S.canal) intro=`Sem novidades de ${NOMES[S.canal]} por aqui — `+
+                             `sobre ${NOMES[c]}: `+intro;
       return {canal:c, texto:intro+it.texto+liga};
     }
   }
@@ -1041,7 +1106,7 @@ function mudaCanal(c){
 /* ═══════════════════ companheiro (a lógica central) ═══════════════════ */
 function modoAtual(){ return S.veloc>3?"carro":"pe"; }
 function horizonte(){ return modoAtual()==="carro"?240:60; }
-function passo(){ return modoAtual()==="carro"?4000:250; }
+function passo(){ return modoAtual()==="carro"?4000:130; }
 
 async function novaPosicao(lat,lon,tMs,velGps){
   const u=S.ultimaPos;
@@ -1059,7 +1124,7 @@ async function novaPosicao(lat,lon,tMs,velGps){
   if(!S.anunciando && S.dAcum-S.ultimoAnuncioD>=passo()) anunciar(lat,lon);
 }
 async function anunciar(lat,lon){
-  S.anunciando=true;
+  S.anunciando=true; S.inicioAnuncio=Date.now();
   try{
     const modo=modoAtual(), ahead=S.veloc*horizonte();
     let pla=lat, plo=lon;
@@ -1217,10 +1282,56 @@ $("#selFonte").onchange=e=>{
   $("#linhaRota").hidden=!sim; $("#linhaTurbo").hidden=!sim;
 };
 
+/* ═══════════════════ manter o ecrã ligado, a sério ═══════════════════
+   Pedir o wake lock uma única vez não chega: qualquer troca de app, puxar a
+   barra de notificações ou o telemóvel decidir poupar bateria liberta-o
+   sem aviso, e a partir daí o Chrome trava temporizadores e pedidos de rede
+   em segundo plano — foi isso que parou os anúncios até tocares num botão. */
+let wakeLock=null, ligado=false;
+async function seguraEcraLigado(){
+  if(!ligado||!navigator.wakeLock) return;
+  try{
+    wakeLock=await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release",()=>{ if(ligado) setTimeout(seguraEcraLigado,500); });
+  }catch(e){ console.warn("wakeLock:",e); }
+}
+document.addEventListener("visibilitychange",()=>{
+  if(ligado&&document.visibilityState==="visible") seguraEcraLigado();
+});
+// truque suplementar: um "vídeo" mudo gerado ao vivo a partir de uma canvas
+// (sem ficheiro nenhum, logo nada a corromper) impede alguns Android de
+// apagar o ecrã mesmo quando a Wake Lock API por si só falha ou é ignorada
+function iniciaVideoAntiSono(){
+  try{
+    const canvas=document.createElement("canvas");
+    canvas.width=2; canvas.height=2;
+    const ctx=canvas.getContext("2d");
+    setInterval(()=>{ ctx.fillRect(0,0,1,1); ctx.clearRect(0,0,1,1); },1000);
+    const stream=canvas.captureStream(1);
+    const v=document.createElement("video");
+    v.muted=true; v.setAttribute("muted",""); v.setAttribute("playsinline","");
+    v.style.cssText="position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;top:0;left:0";
+    v.srcObject=stream;
+    document.body.appendChild(v);
+    v.play().catch(()=>{});
+    document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") v.play().catch(()=>{}); });
+  }catch(e){ console.warn("vídeo anti-sono:",e); }
+}
+
 $("#ligar").onclick=async()=>{
   lePrefs(); pintaCanais(); pintaSom(); pintaDefs();
   $("#arranque").style.display="none";
-  try{ if(navigator.wakeLock) await navigator.wakeLock.request("screen"); }catch(e){}
+  ligado=true;
+  await seguraEcraLigado();
+  iniciaVideoAntiSono();
+  // rede de segurança: se um anúncio ficar pendurado (rede suspensa em
+  // segundo plano), destrava sozinho ao fim de 25s em vez de ficar mudo
+  setInterval(()=>{
+    if(S.anunciando && Date.now()-(S.inicioAnuncio||0)>25000){
+      console.warn("anúncio pendurado — a destravar");
+      S.anunciando=false;
+    }
+  },5000);
   dizJa("Companheiro ligado.");
   S.micAtivo=iniciaOuvido(); pintaMic();
   if(!recDisponivel) regista("cmd","Menu falado indisponível neste browser — usa os botões.");
