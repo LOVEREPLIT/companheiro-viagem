@@ -208,6 +208,58 @@ cada câmara guarda os dados de maneira diferente (não há um "nome da
 camada" universal a copiar de Lisboa para as outras). Expandir para mais
 câmaras é trabalho de descoberta uma a uma, não uma mudança de configuração.
 
+## Verificação cruzada de 4 investigadores externos (agosto 2026, 3.ª ronda)
+
+Pedi a 4 modelos de pesquisa diferentes para encontrarem mais fontes, com um
+critério explícito: só aceitar o que fosse testado de facto com `fetch()`,
+nunca com base em documentação. Resultado — **duas das quatro inventaram
+URLs e dados por completo**, o que confirma que o critério era necessário:
+
+- Uma fonte deu um "endpoint ArcGIS do Porto" com um ID de organização que
+  a própria Esri rejeitou como inválido, e "endpoints" para Coimbra e Braga
+  em domínios que **não existem** (erro "Domain record(s) not found").
+- A mesma fonte deu uma amostra de JSON do INE para o indicador `0011186`
+  como sendo "taxa de desemprego por concelho" — testei o indicador real e
+  é sobre **serviços de associações patronais**, nada a ver. O JSON inteiro,
+  incluindo os números "6.2%" e "7.1%", era inventado.
+- Deu ainda uma fonte de gastronomia (`tradicao.ongd.pt`) cujo domínio nem
+  sequer resolve.
+- Outra fonte deu exemplos de código que faziam `fetch("https://jina.ai")`
+  sozinho — sem endpoint nenhum atrás — como se fosse prova de teste.
+
+As outras duas foram honestas sobre não terem conseguido testar (o ambiente
+delas não corre JavaScript num browser), e uma delas deu pistas reais
+(URLs de feeds concretos) que confirmei eu próprio a seguir.
+
+**O que sobrou depois de testar tudo — real, confirmado, e agora em uso:**
+
+- **INE, população oficial por concelho** — confirmado ponta-a-ponta.
+  O indicador `0008273` desce a nível de concelho (344 municípios,
+  `categ_nivel:"5"`); bloqueia CORS directo mas funciona via `r.jina.ai`.
+  Testei com dados reais: Lisboa 655 542 habitantes (2023), Porto 267 236
+  (2023) — agora usado no canal NÚMEROS, com "segundo o INE (ano)" em vez
+  da estimativa da Wikidata quando há dados oficiais.
+- **6 jornais regionais novos**, testados um a um, que fecham lacunas
+  geográficas que ainda faltavam:
+
+  | Jornal | Cobre |
+  |---|---|
+  | Diário As Beiras | Coimbra, Figueira da Foz, Cantanhede |
+  | Diário dos Açores | Ponta Delgada, São Miguel, e geral dos Açores |
+  | JM Madeira | Madeira geral |
+  | Jornal da Madeira | Madeira (Funchal) |
+  | Funchal Notícias | Funchal, Porto Santo |
+  | Tribuna da Madeira | Madeira geral |
+
+  Com isto, **Açores e Madeira deixam de estar sem cobertura** — eram as
+  duas lacunas mais visíveis da ronda anterior.
+
+**O que continua por fazer:** o INE só tem população integrada; poder de
+compra, envelhecimento e desemprego exigem descobrir o `varcd` certo para
+cada um (o catálogo é real e funciona — só falta o trabalho de encontrar
+os códigos, indicador a indicador, cada um com dimensões diferentes).
+Alentejo interior e Beira interior continuam sem jornal local confirmado.
+
 ## Imprensa regional (investigação de agosto de 2026, 2.ª ronda)
 
 Pedido explícito do João: ir a fontes mais pequenas do que o Google News.

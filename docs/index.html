@@ -581,6 +581,10 @@ const IMPRENSA_REGIONAL=[
   {nomes:["loulé","olhão","faro","portimão","tavira","albufeira","lagos"], fonte:"Jornal do Algarve", feed:"https://jornaldoalgarve.pt/feed/"},
   {nomes:["setúbal"], fonte:"O Setubalense", feed:"https://osetubalense.com/feed/"},
   {nomes:["vila real","chaves","bragança"], fonte:"A Voz de Trás-os-Montes", feed:"https://www.avozdetrasosmontes.pt/feed/"},
+  {nomes:["coimbra","figueira da foz","cantanhede"], fonte:"Diário As Beiras", feed:"https://feeds.feedburner.com/asbeiras"},
+  {nomes:["ponta delgada","são miguel","angra do heroísmo","horta","açores"], fonte:"Diário dos Açores", feed:"https://diariodosacores.pt/feed/"},
+  {nomes:["funchal","madeira"], fonte:"Funchal Notícias", feed:"https://funchalnoticias.net/feed/"},
+  {nomes:["câmara de lobos","santa cruz (madeira)"], fonte:"JM Madeira", feed:"https://www.jm-madeira.pt/rss.jsp?sezione=930"},
 ];
 async function jornalRegional(local){
   const alvo=[local.concelho,local.freguesia].filter(Boolean).map(norm);
@@ -589,7 +593,9 @@ async function jornalRegional(local){
   try{
     const t=await busca(`https://r.jina.ai/${entrada.feed}`,"texto");
     if(!t||t.length<200) return [];
-    return parseNoticiasGenerico(t).map(it=>({...it, fonte:entrada.fonte}));
+    return parseNoticiasGenerico(t)
+      .filter(it=>it.titulo.length>15)     // descarta links de navegação ("Capa", etc.)
+      .map(it=>({...it, fonte:entrada.fonte}));
   }catch(e){ console.warn("jornal regional:",e); return []; }
 }
 function parseNoticiasXML(txt){
@@ -896,6 +902,42 @@ async function canalSabores(f){
   }
   return fora;
 }
+/* ═══════════ INE: população oficial por concelho, confirmada ponta-a-ponta
+   (bloqueia CORS directo, funciona via r.jina.ai). O catálogo de categorias
+   geográficas fica em cache — é grande (344 concelhos) mas só se pede uma
+   vez por sessão. Ver README para o resto da investigação do INE. */
+const INE_POP_VARCD="0008273";
+let _ineCatalogoPop=null;
+async function ineCatalogoPopulacao(){
+  if(_ineCatalogoPop!==null) return _ineCatalogoPop;
+  try{
+    const t=await busca(`https://r.jina.ai/https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=${INE_POP_VARCD}&lang=PT`,"texto");
+    const marca="Markdown Content:\n", i=(t||"").indexOf(marca);
+    const json=JSON.parse((i>=0?t.slice(i+marca.length):t).trim());
+    const dims=json[0].Dimensoes.Categoria_Dim[0];
+    const dim1=Object.keys(dims).filter(k=>k.startsWith("Dim_Num1_")).map(k=>dims[k][0]);
+    const dim2=Object.keys(dims).filter(k=>k.startsWith("Dim_Num2_")).map(k=>dims[k][0]);
+    const ultimoAno=[...dim1].sort((a,b)=>+a.categ_ord-+b.categ_ord).slice(-1)[0];
+    _ineCatalogoPop={ano:ultimoAno.cat_id, concelhos:dim2.filter(x=>x.categ_nivel==="5")};
+  }catch(e){ console.warn("INE catálogo:",e); _ineCatalogoPop=false; }
+  return _ineCatalogoPop;
+}
+async function populacaoINE(nomeConcelho){
+  const cat=await ineCatalogoPopulacao();
+  if(!cat||!nomeConcelho) return null;
+  const m=cat.concelhos.find(c=>norm(c.categ_dsg)===norm(nomeConcelho));
+  if(!m) return null;
+  try{
+    const url=`https://r.jina.ai/https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=${INE_POP_VARCD}&Dim1=${cat.ano}&Dim2=${m.cat_id}&Dim3=T&Dim4=T&lang=PT`;
+    const t=await busca(url,"texto");
+    const marca="Markdown Content:\n", i=(t||"").indexOf(marca);
+    const json=JSON.parse((i>=0?t.slice(i+marca.length):t).trim());
+    const ano=json[0].UltimoPref;
+    const linha=((json[0].Dados||{})[ano]||[])[0];
+    return linha?{populacao:parseInt(linha.valor,10), ano}:null;
+  }catch(e){ console.warn("INE população:",e); return null; }
+}
+
 async function canalDemografia(f){
   const base=f.base.length?f.base:f.escolhidos;
   const ents=await wikidata(base.map(e=>e.qid).filter(Boolean).slice(0,3));
@@ -903,9 +945,14 @@ async function canalDemografia(f){
   for(const e of base.slice(0,[1,2,3][S.detalhe.DEMOGRAFIA-1])){
     const ent=ents[e.qid]; if(!ent) continue;
     const pop=claim(ent,"P1082"), area=claim(ent,"P2046"), alt=claim(ent,"P2044");
+    // o INE, quando tem dados para esta terra, é mais oficial e mais actual
+    // do que a Wikipédia — substitui sem deixar de usar a Wikipédia p'ra o resto
+    const popINE=S.demo.populacao?await populacaoINE(e.titulo):null;
     const b=[];
-    if(S.demo.populacao&&pop.v) b.push(`${Math.round(pop.v)} habitantes${pop.ano?` nos censos de ${pop.ano}`:""}`);
-    if(S.demo.densidade&&pop.v&&area.v) b.push(`${Math.round(pop.v/area.v)} habitantes por quilómetro quadrado`);
+    if(S.demo.populacao&&popINE) b.push(`${popINE.populacao.toLocaleString("pt-PT")} habitantes, segundo o INE (${popINE.ano})`);
+    else if(S.demo.populacao&&pop.v) b.push(`${Math.round(pop.v)} habitantes${pop.ano?` nos censos de ${pop.ano}`:""}`);
+    const popParaDensidade=(popINE&&popINE.populacao)||pop.v;
+    if(S.demo.densidade&&popParaDensidade&&area.v) b.push(`${Math.round(popParaDensidade/area.v)} habitantes por quilómetro quadrado`);
     if(S.demo.area&&area.v) b.push(`${Math.round(area.v)} quilómetros quadrados de área`);
     if(S.demo.altitude&&alt.v) b.push(`${Math.round(alt.v)} metros de altitude`);
     if(b.length) fora.push({chave:`demo:${e.titulo}`, texto:`${e.titulo}: ${b.join("; ")}.`});
