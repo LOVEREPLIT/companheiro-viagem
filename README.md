@@ -176,6 +176,46 @@ aldeias do interior. A cobertura da Wikipédia em português é melhor do que
 eu esperava para o Portugal rural — em Monsaraz apanhou o castelo e dois
 menires classificados como Monumento Nacional.
 
+## Fontes locais oficiais (Lisboa) — investigação de agosto de 2026
+
+A Wikipédia sozinha esgota-se depressa em zonas residenciais e por vezes
+salta para um artigo nacional genérico por falta de alternativa. Investigação
+a fundo a fontes portuguesas gratuitas encontrou uma excelente para Lisboa:
+
+- **Câmara de Lisboa (ArcGIS Hub, `geodados-cml.hub.arcgis.com`)** — ao
+  contrário da maioria das câmaras, responde directamente do browser, sem
+  proxy. Duas camadas usadas:
+  - `Cultura_Toponimia` — a justificação HISTÓRICA OFICIAL de cada nome de
+    rua, escrita pela própria Câmara. Substitui a adivinhação via Wikipédia
+    quando existe, com texto oficial e sem inventar nada.
+  - `Patrimonio` (camadas 11 e 12) + `Cultura_CasasReligiosas` — inventário
+    de monumentos classificados com descrições completas escritas por
+    técnicos de património, muito mais ricas que o resumo da Wikipédia.
+- **geoapi.pt** — serviço português gratuito e sem chave; devolve numa só
+  chamada leve a localização oficial, temperatura/humidade em tempo real, e
+  risco de incêndio/inundação **por ponto exacto** (não ao nível do distrito
+  inteiro, como o IPMA). Conteúdo que muda sempre, nunca repete.
+- **agendalx.pt** — agenda cultural oficial de Lisboa, eventos reais e a
+  decorrer (sem coordenadas por evento — entra como "o que se passa na
+  cidade", reforço da Actualidade).
+
+**Porquê só Lisboa, por agora:** a plataforma técnica que cada câmara usa
+decide se dá para aceder directo do browser. As que usam **ArcGIS Hub**
+(Lisboa) respondem sem proxy. As que usam **CKAN** (Porto, Cascais,
+Guimarães, Águeda — confirmado por teste directo) bloqueiam por CORS e
+precisavam do mesmo proxy já usado nas notícias — mais lento e frágil, e
+cada câmara guarda os dados de maneira diferente (não há um "nome da
+camada" universal a copiar de Lisboa para as outras). Expandir para mais
+câmaras é trabalho de descoberta uma a uma, não uma mudança de configuração.
+
+**Imprensa regional (recortes.pt):** agrega ~14 jornais regionais pequenos
+(Diário de Aveiro, Diário de Coimbra, Diário de Leiria, Diário de Viseu,
+Gazeta das Caldas, Jornal da Bairrada, Jornal da Beira, Cerveira Nova, Voz
+de Mira, entre outros) que o Google News nem sempre indexa bem. Cobertura
+real mas estreita — só essas zonas específicas, não o país todo. Vale como
+reforço nalgumas regiões, não substitui a escalada freguesia→concelho→
+distrito já em uso.
+
 ## O que ficou por resolver
 
 1. **Economia é o canal fraco.** Concelhos pequenos não têm secção "Economia"

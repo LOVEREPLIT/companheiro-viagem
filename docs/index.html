@@ -211,9 +211,19 @@ function avanca(lat,lon,rumo,dist){          // previsão: onde vou estar a segu
   const lo2=lo1+Math.atan2(Math.sin(th)*Math.sin(d)*Math.cos(la1),Math.cos(d)-Math.sin(la1)*Math.sin(la2));
   return [la2/r, lo2/r];
 }
+// abreviaturas comuns em PT que terminam em ponto mas NÃO acabam a frase —
+// sem isto, "sofreu obras no séc. XVIII" cortava-se logo a seguir a "séc."
+const RE_ABREV=/\b(séc|n|art|nº|s|sto|sta|dr|dra|prof|sr|sra|ex|av|r|etc|D)\.$/i;
 function frases(t,n){
   t=(t||"").replace(/={2,}[^=\n]{0,80}={2,}/g," ").replace(/\s+/g," ").trim();
-  return t.split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/).slice(0,n).join(" ");
+  const brutas=t.split(/(?<=[.!?])\s+(?=[A-ZÀ-Þ0-9])/);
+  const fora=[];
+  for(const f of brutas){
+    if(fora.length && RE_ABREV.test(fora[fora.length-1])) fora[fora.length-1]+=" "+f;
+    else fora.push(f);
+    if(fora.length>=n && !RE_ABREV.test(fora[fora.length-1])) break;
+  }
+  return fora.slice(0,n).join(" ");
 }
 function seccoes(t){
   const fora={"":""}; let ult=""; const re=/\n=+\s*([^=\n]{1,80}?)\s*=+/g;
@@ -341,6 +351,111 @@ async function wikiGeo(lat,lon,lang,raio){
   const d=await busca(WIKI(lang)+`list=geosearch&gscoord=${lat}%7C${lon}&gsradius=${Math.min(raio,10000)}&gslimit=30`);
   return (d&&d.query&&d.query.geosearch)||[];
 }
+
+/* ═══════════ geoapi.pt: localização oficial + tempo real + riscos ═══════════
+   Serviço português gratuito, sem chave, com CORS livre. Dá numa só chamada
+   leve o que a Wikipédia e o IPMA nunca dão por ponto exacto: temperatura e
+   humidade agora mesmo, e risco de incêndio/inundação ali onde estás — não
+   ao nível do distrito inteiro. É conteúdo que muda sempre, nunca repete. */
+async function tempoAgora(lat,lon){
+  if(Date.now()-(S.ultimoTempo||0)<15*60e3) return null;   // uma vez a cada ~15 min
+  try{
+    const d=await busca(`https://json.geoapi.pt/gps/${lat},${lon}`);
+    if(!d||!d.clima) return null;
+    S.ultimoTempo=Date.now();
+    const c=d.clima;
+    let texto=`Estão ${Math.round(c["temperatura_C"])} graus e ${Math.round(c["humidade_%"])}% de humidade por aqui.`;
+    const riscos=[];
+    if(d.perigo_incendio&&!/nulo/i.test(d.perigo_incendio)) riscos.push(`risco de incêndio ${d.perigo_incendio.toLowerCase()}`);
+    if(d.perigo_inundacao&&!/nulo/i.test(d.perigo_inundacao)) riscos.push(`risco de inundação ${d.perigo_inundacao.toLowerCase()}`);
+    if(riscos.length) texto+=` Atenção: ${riscos.join(" e ")}.`;
+    return texto;
+  }catch(e){ console.warn("geoapi.pt:",e); return null; }
+}
+
+/* ═══════════ Lisboa: dados oficiais da Câmara Municipal (ArcGIS, CORS livre) ═══
+   A CML publica, ao contrário da maioria das câmaras, num serviço ArcGIS Hub
+   que responde directamente do browser (sem proxy). Duas camadas valem ouro:
+     · Cultura_Toponimia — a justificação HISTÓRICA OFICIAL de cada nome de
+       rua, escrita pela própria Câmara. Substitui a adivinhação via Wikipédia
+       sempre que existir, com muito mais cobertura e sem inventar nada.
+     · Património — inventário de monumentos e imóveis classificados, com
+       descrições completas escritas por técnicos de património.
+   Ver README para o resultado da investigação e porque só Lisboa, por agora. */
+const CML_TOPONIMIA="https://services.arcgis.com/1dSrzEWVQn5kHHyK/arcgis/rest/services/Cultura_Toponimia/FeatureServer/0";
+const CML_PATRIMONIO="https://services.arcgis.com/1dSrzEWVQn5kHHyK/arcgis/rest/services/Patrimonio/FeatureServer";
+const CML_CASAS_RELIGIOSAS="https://services.arcgis.com/1dSrzEWVQn5kHHyK/arcgis/rest/services/Cultura_CasasReligiosas/FeatureServer/0";
+
+function ehLisboa(local){ return norm((local&&local.concelho)||"")==="lisboa"; }
+
+async function arcgisPerto(url,lat,lon,raioM,outFields){
+  const q=`${url}/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326`+
+          `&spatialRel=esriSpatialRelIntersects&distance=${raioM}&units=esriSRUnit_Meter`+
+          `&outFields=${outFields}&outSR=4326&f=geojson`;
+  const d=await busca(q);
+  return ((d&&d.features)||[]).map(f=>({props:f.properties, geom:f.geometry}));
+}
+function _limpaHistorial(txt){
+  txt=(txt||"").replace(/\[[A-ZÀ-Ú]{1,4}\]\s*$/,"").replace(/[\r\n]+/g," ").replace(/\s+/g," ").trim();
+  return frases(txt,3);
+}
+/* a rua exacta onde estás, pelo nome — mais fiável do que pesquisar por
+   proximidade (a Toponímia guarda a rua toda como uma linha, não um ponto) */
+async function toponimiaCML(rua,lat,lon){
+  if(!rua) return null;
+  // 1.ª tentativa: nome exacto — é o que acontece na maioria das ruas,
+  // onde a Câmara escreve a designação tal e qual o Nominatim
+  const exacto=`UPPER(DESIGNACAO)=UPPER('${rua.replace(/'/g,"''")}')`;
+  const dExacto=await busca(`${CML_TOPONIMIA}/query?where=${encodeURIComponent(exacto)}&outFields=DESIGNACAO,HISTORIAL,TEMAS&outSR=4326&f=geojson`);
+  const featsExactos=((dExacto&&dExacto.features)||[]);
+  if(featsExactos.length===1) return featsExactos[0].properties;
+
+  // 2.ª tentativa: núcleo sem tipo de via nem tratamento (ex: "Dom"/"D.")
+  // — só entra quando o nome exacto não bateu certo (abreviaturas, etc.)
+  let nucleo=rua.replace(TIPO_VIA,"").trim();
+  nucleo=nucleo.replace(/^(dom|dona|d\.|santo|sto\.?|santa|sta\.?|são|s\.)\s+/i,"").trim();
+  if(nucleo.length<3) return null;
+  // rede larga no servidor (só a 1.ª palavra), filtro exacto por PALAVRA
+  // INTEIRA no cliente — "Pedro IV" não pode apanhar "Pedro Ivo" por engano
+  const primeira=nucleo.split(/\s+/)[0].toUpperCase().replace(/'/g,"''");
+  const where=`UPPER(DESIGNACAO) LIKE '%${primeira}%'`;
+  const q=`${CML_TOPONIMIA}/query?where=${encodeURIComponent(where)}`+
+          `&outFields=DESIGNACAO,HISTORIAL,TEMAS&outSR=4326&f=geojson`;
+  const d=await busca(q);
+  let feats=((d&&d.features)||[]);
+  const reExacto=new RegExp("\\b"+nucleo.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i");
+  const exactos=feats.filter(f=>reExacto.test(f.properties.DESIGNACAO||""));
+  if(exactos.length) feats=exactos;
+  if(!feats.length) return null;
+  if(feats.length===1) return feats[0].properties;
+  let melhor=null, melhorD=Infinity;                    // várias ruas com nome parecido
+  for(const f of feats){                                // — fica com a mais próxima
+    const g=f.geometry, pt=g&&(g.type==="Point"?g.coordinates:(g.paths?g.paths[0][0]:g.coordinates&&g.coordinates[0]));
+    if(!pt) continue;
+    const d2=distM(lat,lon,pt[1],pt[0]);
+    if(d2<melhorD){melhorD=d2; melhor=f.properties;}
+  }
+  return melhor||feats[0].properties;
+}
+/* monumentos e casas religiosas classificados perto de ti, com a descrição
+   oficial completa — usado pelo canal HISTÓRIA como reforço, não substituto */
+async function patrimonioCML(lat,lon,raioM){
+  const [monPub,monNac,casas]=await Promise.all([
+    arcgisPerto(`${CML_PATRIMONIO}/11`,lat,lon,raioM,"INF_NOME,INF_DESCRICAO"),
+    arcgisPerto(`${CML_PATRIMONIO}/12`,lat,lon,raioM,"INF_NOME,INF_DESCRICAO"),
+    arcgisPerto(CML_CASAS_RELIGIOSAS,lat,lon,raioM,"DESIGNACAO"),
+  ]);
+  const fora=[];
+  for(const {props:p} of [...monPub,...monNac]){
+    if(!p.INF_NOME||fora.some(x=>x.chave===p.INF_NOME)) continue;
+    fora.push({chave:p.INF_NOME, texto:`${p.INF_NOME}. ${frases(p.INF_DESCRICAO||"",3)}`});
+  }
+  for(const {props:p} of casas){
+    if(!p.DESIGNACAO||fora.some(x=>x.chave===p.DESIGNACAO)) continue;
+    fora.push({chave:p.DESIGNACAO, texto:`${p.DESIGNACAO}, uma casa religiosa histórica de Lisboa.`});
+  }
+  return fora;
+}
 async function wikiPaginas(ids,lang,soIntro=true){
   const fora={};
   for(let i=0;i<ids.length;i+=20){
@@ -455,6 +570,23 @@ function parseNoticiasXML(txt){
       return {titulo, fonte};
     });
   }catch(e){ return []; }
+}
+/* agendalx.pt: agenda cultural oficial de Lisboa, eventos reais e a decorrer.
+   Não tem coordenadas por evento — é "o que se passa na cidade", não
+   hiperlocal à rua, por isso entra como reforço da Actualidade, uma vez. */
+async function eventoLisboaPorContar(){
+  const d=await busca("https://www.agendalx.pt/wp-json/agendalx/v1/events");
+  if(!Array.isArray(d)) return null;
+  for(const ev of d){
+    const titulo=(ev.title&&ev.title.rendered)||"";
+    const chave=`agenda:${titulo}`;
+    if(!titulo||S.ditos.has(chave)) continue;
+    const local=Object.values(ev.venue||{})[0];
+    const desc=frases((ev.description||[])[0]||"",2);
+    marcaDito(chave);
+    return {chave, texto:`Em Lisboa: ${titulo}${local?`, em ${local.name}`:""}. ${desc}`};
+  }
+  return null;
 }
 async function noticiasPara(nome){
   const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(`"${nome}" when:120d`)}&hl=pt-PT&gl=PT&ceid=PT:pt-150`;
@@ -587,6 +719,15 @@ function claim(ent,prop){
 async function canalHistoria(f){
   const n=[1,3,5][S.detalhe.HISTORIA-1];
   const fora=f.escolhidos.map(e=>({chave:e.titulo, texto:`${e.titulo}. ${frases(e.texto,n)}`}));
+  // Lisboa: reforça com o inventário oficial de património da Câmara —
+  // descrições completas, escritas por técnicos, não o resumo da Wikipédia
+  if(ehLisboa(f.local)&&f.lat!=null){
+    try{
+      const raio=f.modo==="carro"?9000:700;
+      for(const it of await patrimonioCML(f.lat,f.lon,raio))
+        if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
+    }catch(e){ console.warn("património CML:",e); }
+  }
   if(S.extra.gente){
     const qids=f.base.map(e=>e.qid).filter(Boolean).slice(0,2);
     if(qids.length){
@@ -708,12 +849,25 @@ async function canalEconomia(f){
 async function canalActualidade(f){
   const nome=nomeNoticias(f.local)||(f.escolhidos[0]||{}).titulo;
   if(!nome) return [];
+  const fora=[];
+
+  // Lisboa: agenda cultural real da Câmara — o que está mesmo a acontecer,
+  // não só notícias. Complementa, não substitui.
+  if(ehLisboa(f.local)){
+    try{
+      const ev=await eventoLisboaPorContar();
+      if(ev) fora.push(ev);
+    }catch(e){ console.warn("agenda Lisboa:",e); }
+  }
+
   const it=await noticias(f.local);
-  if(!it.length) return [];
-  const n=[1,2,4][S.detalhe.ACTUALIDADE-1];
-  const escolha=it.slice(0,n);
-  return [{chave:`news:${escolha[0].titulo.slice(0,80)}`,
-           texto:`Notícias de ${nome}: `+escolha.map(x=>x.titulo).join(". ")}];
+  if(it.length){
+    const n=[1,2,4][S.detalhe.ACTUALIDADE-1];
+    const escolha=it.slice(0,n);
+    fora.push({chave:`news:${escolha[0].titulo.slice(0,80)}`,
+               texto:`Notícias de ${nome}: `+escolha.map(x=>x.titulo).join(". ")});
+  }
+  return fora;
 }
 async function canalPOI(f,lat,lon){          // só a pé: o que se vê à volta
   const els=await overpass(lat,lon);
@@ -797,7 +951,7 @@ async function pessoaPorNome(nome){
 }
 
 /* a pé: o pormenor da rua e do bairro onde estás AGORA */
-async function detalheRua(lat,lon){
+async function detalheRua(lat,lon,local){
   if(!S.extra.rua) return null;
   const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=17&addressdetails=1&accept-language=pt`);
   const a=(d&&d.address)||{};
@@ -808,6 +962,19 @@ async function detalheRua(lat,lon){
   if(S.ditos.has(chave)) return null;
   marcaDito(chave);
   let texto=`Estás na ${rua}${bairro?`, no bairro de ${bairro}`:""}.`;
+
+  // 0) Lisboa: a Câmara sabe mesmo porquê — sem adivinhar nada
+  if(ehLisboa(local)){
+    try{
+      const top=await toponimiaCML(rua,lat,lon);
+      if(top&&top.HISTORIAL&&top.HISTORIAL.trim().length>40){
+        texto+=` ${_limpaHistorial(top.HISTORIAL)}`;
+        marcaDito(`topo:${top.DESIGNACAO||rua}`);
+        registaEntidade(rua,bairro||S.ultimoConcelho);
+        return {chave, texto};
+      }
+    }catch(e){ console.warn("toponímia CML:",e); }
+  }
 
   // 1) a rua tem nome de pessoa? é o pormenor que mais vale a pena contar
   try{
@@ -1134,7 +1301,7 @@ async function anunciar(lat,lon){
     // a freguesia/concelho tem quase sempre artigo em português — não
     // herda a língua da pesquisa (por vezes inglesa) do monumento vizinho
     const base=await artigosLocalidade(local,pla,plo,"pt");
-    const f={local,escolhidos,base,lang:"pt",todos:todos||[]};
+    const f={local,escolhidos,base,lang:"pt",todos:todos||[],lat:pla,lon:plo,modo};
     $("#chipLocal").textContent=local.linha;
 
     let pre="";
@@ -1150,6 +1317,12 @@ async function anunciar(lat,lon){
       const t=paraVoz(av.texto);
       regista("ACTUALIDADE","⚠️ "+t); diz(t,null);
     }
+    // tempo real e riscos por ponto exacto (geoapi.pt) — muda sempre,
+    // nunca fica repetitivo, e não precisa de canal nenhum activo
+    try{
+      const tempo=await tempoAgora(lat,lon);
+      if(tempo){ const t=paraVoz(tempo); regista("ACTUALIDADE","🌤 "+t); diz(t,null); }
+    }catch(e){ console.warn("tempo:",e); }
     // sazonalidade e efemérides: o presente e o calendário desta terra
     try{
       const fe=await festasDoMes(f);
@@ -1159,7 +1332,7 @@ async function anunciar(lat,lon){
     }catch(e){ console.warn("calendário:",e); }
     // a pé, o pormenor da rua onde estás agora
     if(modo==="pe"){
-      const r=await detalheRua(lat,lon);
+      const r=await detalheRua(lat,lon,local);
       if(r){ pre+=r.texto+" "; }
     }
     const n=await narrar(f,pla,plo,modo);
