@@ -208,13 +208,43 @@ cada câmara guarda os dados de maneira diferente (não há um "nome da
 camada" universal a copiar de Lisboa para as outras). Expandir para mais
 câmaras é trabalho de descoberta uma a uma, não uma mudança de configuração.
 
-**Imprensa regional (recortes.pt):** agrega ~14 jornais regionais pequenos
-(Diário de Aveiro, Diário de Coimbra, Diário de Leiria, Diário de Viseu,
-Gazeta das Caldas, Jornal da Bairrada, Jornal da Beira, Cerveira Nova, Voz
-de Mira, entre outros) que o Google News nem sempre indexa bem. Cobertura
-real mas estreita — só essas zonas específicas, não o país todo. Vale como
-reforço nalgumas regiões, não substitui a escalada freguesia→concelho→
-distrito já em uso.
+## Imprensa regional (investigação de agosto de 2026, 2.ª ronda)
+
+Pedido explícito do João: ir a fontes mais pequenas do que o Google News.
+Investigação a fontes portuguesas de jornalismo local, testada uma a uma:
+
+- **recortes.pt** agrega ~14 jornais regionais pequenos (Diário de Aveiro,
+  Diário de Coimbra, Diário de Leiria, Diário de Viseu, Gazeta das Caldas,
+  Jornal da Bairrada, Jornal da Beira, Cerveira Nova, Voz de Mira). A página
+  em si bloqueia por CORS e não foi integrada — documentado, não implementado.
+- **Olh'ó Regional** (`olho-regional.pages.dev`) — projeto sério e rigoroso:
+  pediu à ERC a lista completa de publicações registadas (4679), filtrou
+  para regionais com presença online (663), complementou com o projeto
+  Memória da Imprensa Portuguesa (573 finais), e mapeou cobertura aos 308
+  municípios, identificando 100 "desertos de notícias". A sua API
+  (`/api/jornais`) esteve **confirmadamente avariada** durante o teste
+  ("Worker threw exception", erro 500) — não deu para integrar ao vivo.
+  Vale a pena revisitar; entretanto, serviu para identificar jornais reais.
+- **Jornais integrados e testados um a um** (via `r.jina.ai`, o mesmo proxy
+  já usado no Google News) — entram ANTES da pesquisa genérica quando o
+  concelho bate certo, por serem jornalismo local editado, não agregação:
+
+  | Jornal | Cobre |
+  |---|---|
+  | Sintra Notícias | Sintra, Cascais, Oeiras, Amadora, Mafra |
+  | Pombal Jornal | Pombal |
+  | Jornal de Albergaria | Albergaria-a-Velha, Águeda |
+  | O Minho | Braga, Barcelos, Guimarães, Vila Verde, Esposende |
+  | Jornal do Algarve | Loulé, Olhão, Faro, Portimão, Tavira, Albufeira, Lagos |
+  | O Setubalense | Setúbal |
+  | A Voz de Trás-os-Montes | Vila Real, Chaves, Bragança |
+
+  Testados e descartados por não responderem/não terem feed válido:
+  Algarve Primeiro, Setúbal Notícias, Diário de Trás-os-Montes, A Voz de
+  Ermesinde (a URL de RSS encontrada era uma página de explicação, não o
+  feed real). Continua a faltar: Alentejo interior, Coimbra cidade, Beira
+  interior, Açores, Madeira — nenhum jornal local com feed válido encontrado
+  ainda para essas zonas nesta ronda.
 
 ## O que ficou por resolver
 
