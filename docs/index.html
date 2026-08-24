@@ -902,40 +902,66 @@ async function canalSabores(f){
   }
   return fora;
 }
-/* ═══════════ INE: população oficial por concelho, confirmada ponta-a-ponta
-   (bloqueia CORS directo, funciona via r.jina.ai). O catálogo de categorias
-   geográficas fica em cache — é grande (344 concelhos) mas só se pede uma
-   vez por sessão. Ver README para o resto da investigação do INE. */
-const INE_POP_VARCD="0008273";
-let _ineCatalogoPop=null;
-async function ineCatalogoPopulacao(){
-  if(_ineCatalogoPop!==null) return _ineCatalogoPop;
+/* ═══════════ INE: indicadores oficiais por concelho, confirmados um a um
+   com pedidos reais antes de entrarem aqui (bloqueiam CORS directo,
+   funcionam via r.jina.ai). Cada indicador só precisa do ano (Dim1) e do
+   concelho (Dim2); alguns têm uma dimensão extra que se fixa em "T"=Total.
+   Sempre que possível, compara-se com Lisboa — pedido explícito do João,
+   por ser a capital. Ver README para o resto da investigação (incluindo
+   o desemprego, que o INE só publica ao nível do distrito, não concelho —
+   não há forma honesta de o dar por concelho com esta fonte). */
+const INE_INDICADORES={
+  POPULACAO:      {varcd:"0008273", extra:{Dim3:"T",Dim4:"T"}},
+  ENVELHECIMENTO: {varcd:"0008258", extra:{}},
+  PODER_COMPRA:   {varcd:"0008614", extra:{}},
+  GANHO_MEDIO:    {varcd:"0012653", extra:{Dim3:"T"}},
+};
+const _ineCatalogo={};
+async function ineCatalogo(varcd){
+  if(_ineCatalogo[varcd]!==undefined) return _ineCatalogo[varcd];
   try{
-    const t=await busca(`https://r.jina.ai/https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=${INE_POP_VARCD}&lang=PT`,"texto");
+    const t=await busca(`https://r.jina.ai/https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=${varcd}&lang=PT`,"texto");
     const marca="Markdown Content:\n", i=(t||"").indexOf(marca);
     const json=JSON.parse((i>=0?t.slice(i+marca.length):t).trim());
     const dims=json[0].Dimensoes.Categoria_Dim[0];
     const dim1=Object.keys(dims).filter(k=>k.startsWith("Dim_Num1_")).map(k=>dims[k][0]);
     const dim2=Object.keys(dims).filter(k=>k.startsWith("Dim_Num2_")).map(k=>dims[k][0]);
     const ultimoAno=[...dim1].sort((a,b)=>+a.categ_ord-+b.categ_ord).slice(-1)[0];
-    _ineCatalogoPop={ano:ultimoAno.cat_id, concelhos:dim2.filter(x=>x.categ_nivel==="5")};
-  }catch(e){ console.warn("INE catálogo:",e); _ineCatalogoPop=false; }
-  return _ineCatalogoPop;
+    _ineCatalogo[varcd]={ano:ultimoAno.cat_id, concelhos:dim2.filter(x=>x.categ_nivel==="5")};
+  }catch(e){ console.warn("INE catálogo",varcd,e); _ineCatalogo[varcd]=false; }
+  return _ineCatalogo[varcd];
 }
-async function populacaoINE(nomeConcelho){
-  const cat=await ineCatalogoPopulacao();
+async function ineValor(chave,nomeConcelho){
+  const cfg=INE_INDICADORES[chave];
+  const cat=await ineCatalogo(cfg.varcd);
   if(!cat||!nomeConcelho) return null;
   const m=cat.concelhos.find(c=>norm(c.categ_dsg)===norm(nomeConcelho));
   if(!m) return null;
   try{
-    const url=`https://r.jina.ai/https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=${INE_POP_VARCD}&Dim1=${cat.ano}&Dim2=${m.cat_id}&Dim3=T&Dim4=T&lang=PT`;
+    const extra=Object.entries(cfg.extra).map(([k,v])=>`${k}=${v}`).join("&");
+    const url=`https://r.jina.ai/https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=${cfg.varcd}&Dim1=${cat.ano}&Dim2=${m.cat_id}${extra?"&"+extra:""}&lang=PT`;
     const t=await busca(url,"texto");
     const marca="Markdown Content:\n", i=(t||"").indexOf(marca);
     const json=JSON.parse((i>=0?t.slice(i+marca.length):t).trim());
     const ano=json[0].UltimoPref;
     const linha=((json[0].Dados||{})[ano]||[])[0];
-    return linha?{populacao:parseInt(linha.valor,10), ano}:null;
-  }catch(e){ console.warn("INE população:",e); return null; }
+    if(!linha) return null;
+    return {valor:parseFloat(String(linha.valor).replace(/\s/g,"").replace(",",".")), ano};
+  }catch(e){ console.warn("INE valor",chave,e); return null; }
+}
+/* devolve o valor daqui e, sempre que fizer sentido, o valor em Lisboa */
+async function ineComLisboa(chave,nomeConcelho){
+  if(!nomeConcelho) return {aqui:null, lisboa:null};
+  const ehLisboaJa=norm(nomeConcelho)==="lisboa";
+  const [aqui,lisboa]=await Promise.all([
+    ineValor(chave,nomeConcelho),
+    ehLisboaJa?Promise.resolve(null):ineValor(chave,"Lisboa"),
+  ]);
+  return {aqui, lisboa};
+}
+async function populacaoINE(nomeConcelho){
+  const {aqui}=await ineComLisboa("POPULACAO",nomeConcelho);
+  return aqui?{populacao:Math.round(aqui.valor), ano:aqui.ano}:null;
 }
 
 async function canalDemografia(f){
@@ -947,7 +973,14 @@ async function canalDemografia(f){
     const pop=claim(ent,"P1082"), area=claim(ent,"P2046"), alt=claim(ent,"P2044");
     // o INE, quando tem dados para esta terra, é mais oficial e mais actual
     // do que a Wikipédia — substitui sem deixar de usar a Wikipédia p'ra o resto
-    const popINE=S.demo.populacao?await populacaoINE(e.titulo):null;
+    let popINE=S.demo.populacao?await populacaoINE(e.titulo):null;
+    if(!popINE&&S.demo.populacao){
+      // "Reguengos de Monsaraz (freguesia)" vs "Reguengos de Monsaraz" no
+      // INE — só tenta de novo se for mesmo o concelho, não outra freguesia
+      const concLimpo=limpaNomeLocal(f.local.concelho||"");
+      if(concLimpo&&norm(concLimpo)===norm(e.titulo.replace(/\s*\(.*?\)\s*$/,"")))
+        popINE=await populacaoINE(concLimpo);
+    }
     const b=[];
     if(S.demo.populacao&&popINE) b.push(`${popINE.populacao.toLocaleString("pt-PT")} habitantes, segundo o INE (${popINE.ano})`);
     else if(S.demo.populacao&&pop.v) b.push(`${Math.round(pop.v)} habitantes${pop.ano?` nos censos de ${pop.ano}`:""}`);
@@ -956,6 +989,20 @@ async function canalDemografia(f){
     if(S.demo.area&&area.v) b.push(`${Math.round(area.v)} quilómetros quadrados de área`);
     if(S.demo.altitude&&alt.v) b.push(`${Math.round(alt.v)} metros de altitude`);
     if(b.length) fora.push({chave:`demo:${e.titulo}`, texto:`${e.titulo}: ${b.join("; ")}.`});
+
+  }
+  // envelhecimento (INE, só existe ao nível do CONCELHO — não da freguesia
+  // nem do título da Wikipédia, daí usar-se f.local.concelho aqui)
+  const concelhoIne=limpaNomeLocal(f.local.concelho||"");
+  if(S.demo.populacao&&concelhoIne){
+    try{
+      const {aqui,lisboa}=await ineComLisboa("ENVELHECIMENTO",concelhoIne);
+      if(aqui){
+        let t=`Em ${concelhoIne} há ${Math.round(aqui.valor)} idosos por cada 100 jovens (${aqui.ano})`;
+        t+=lisboa?`; em Lisboa são ${Math.round(lisboa.valor)}.`:".";
+        fora.push({chave:`envelh:${concelhoIne}`, texto:t});
+      }
+    }catch(e2){ console.warn("envelhecimento:",e2); }
   }
   return fora;
 }
@@ -976,6 +1023,31 @@ async function canalEconomia(f){
     const bons=fs.filter(x=>x.length>60&&x.length<400&&ECON_FORTE.some(k=>x.toLowerCase().includes(k)))
                  .filter(x=>!/século|\b1[0-9]{3}\b/.test(x.toLowerCase()));
     if(bons.length) fora.push({chave:`eco:${e.titulo}`, texto:`${e.titulo}: ${bons.slice(0,Math.max(1,nF-1)).join(" ")}`});
+  }
+  // poder de compra e ganho médio (INE, só existe ao nível do CONCELHO —
+  // usa-se f.local.concelho, não o título do artigo da Wikipédia, pela
+  // mesma razão da demografia). Sempre comparados com Lisboa. O desemprego
+  // o INE não publica ao nível de concelho (só distrito) — sem alternativa
+  // honesta encontrada até agora.
+  const concelhoIne=limpaNomeLocal(f.local.concelho||"");
+  if(concelhoIne){
+    try{
+      const {aqui,lisboa}=await ineComLisboa("PODER_COMPRA",concelhoIne);
+      if(aqui){
+        let t=`O poder de compra per capita em ${concelhoIne} é ${aqui.valor.toFixed(1)} `+
+              `(a média do país é 100, ${aqui.ano})`;
+        t+=lisboa?`; em Lisboa é ${lisboa.valor.toFixed(1)}.`:".";
+        fora.push({chave:`poder:${concelhoIne}`, texto:t});
+      }
+    }catch(e){ console.warn("poder de compra:",e); }
+    try{
+      const {aqui,lisboa}=await ineComLisboa("GANHO_MEDIO",concelhoIne);
+      if(aqui){
+        let t=`O ganho médio mensal em ${concelhoIne} é ${Math.round(aqui.valor)} euros (${aqui.ano})`;
+        t+=lisboa?`; em Lisboa é ${Math.round(lisboa.valor)} euros.`:".";
+        fora.push({chave:`ganho:${concelhoIne}`, texto:t});
+      }
+    }catch(e){ console.warn("ganho médio:",e); }
   }
   return fora;
 }

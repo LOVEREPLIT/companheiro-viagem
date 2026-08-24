@@ -208,6 +208,42 @@ cada câmara guarda os dados de maneira diferente (não há um "nome da
 camada" universal a copiar de Lisboa para as outras). Expandir para mais
 câmaras é trabalho de descoberta uma a uma, não uma mudança de configuração.
 
+## 4 indicadores INE, sempre comparados com Lisboa (agosto 2026, 4.ª ronda)
+
+Pedido do João: descobrir os códigos e integrar poder de compra,
+envelhecimento, desemprego e "todos os indicadores interessantes",
+comparando sempre com a capital. Métodos dos códigos: pesquisa dirigida
+por indicador, depois confirmação real de cada `varcd` (nome, último ano,
+e se a dimensão geográfica desce a `categ_nivel:"5"` = concelho).
+
+**4 indicadores confirmados e integrados**, cada um testado com dados reais
+antes de entrar no código:
+
+| Indicador | varcd | Canal | Testado com |
+|---|---|---|---|
+| População residente | `0008273` | NÚMEROS | Lisboa 655 542 (2023) |
+| Índice de envelhecimento | `0008258` | NÚMEROS | Reguengos 204 vs Lisboa 169 idosos/100 jovens |
+| Poder de compra per capita | `0008614` | ECONOMIA | Reguengos 90,9 vs Lisboa 186,3 (país=100) |
+| Ganho médio mensal | `0012653` | ECONOMIA | Reguengos 1237€ vs Lisboa 2121€ (2024) |
+
+Todos comparam sempre com Lisboa (excepto quando já se está em Lisboa).
+Testados e descartados por não descerem a concelho (só distrito ou país):
+`0001272` (envelhecimento por sexo, sem geografia fina), `0010704` (taxa
+de desemprego, só distrito), `0010697` (rendimento médio, só distrito).
+
+**Desemprego por concelho: não existe no INE.** O Inquérito ao Emprego é
+uma sondagem por amostragem, sem escala estatística para 308 municípios —
+só desce a distrito. A alternativa real é o IEFP (desempregados inscritos
+nos centros de emprego, dados mensais por concelho, publicados no
+dados.gov.pt), mas o portal bloqueia CORS mesmo via proxy nesta ronda —
+fica documentado para uma futura tentativa, não implementado.
+
+Um bug real apanhado a testar: o nome do artigo da Wikipédia às vezes é
+"X (freguesia)" quando existe também uma freguesia-sede com o mesmo nome
+do concelho — isso não batia certo com o nome que o INE usa. Corrigido ao
+usar sempre `f.local.concelho` (limpo) para os pedidos ao INE, nunca o
+título do artigo da Wikipédia.
+
 ## Verificação cruzada de 4 investigadores externos (agosto 2026, 3.ª ronda)
 
 Pedi a 4 modelos de pesquisa diferentes para encontrarem mais fontes, com um
