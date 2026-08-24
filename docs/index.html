@@ -752,6 +752,45 @@ function claim(ent,prop){
 }
 
 /* canais — respeitam as preferências de detalhe */
+/* a pé, quando a frente está pobre em informação: olha também para trás,
+   esquerda e direita — pedido explícito. Uma só pesquisa (não três) a
+   partir da posição REAL (não da posição projetada à frente); agrupa o
+   que encontra por sector angular relativo ao rumo em que vais. */
+function anguloEntre(a,b){ const d=Math.abs(a-b)%360; return d>180?360-d:d; }
+async function olharEmVolta(lat,lon,rumo,jaUsados){
+  if(rumo==null||lat==null) return [];
+  const arts=await wikiGeo(lat,lon,"pt",400);
+  if(!arts.length) return [];
+  const pags=await wikiPaginas(arts.map(a=>a.pageid),"pt");
+  const usados=new Set(jaUsados);
+  const setores=[
+    {nome:"à tua esquerda", centro:(rumo-90+360)%360},
+    {nome:"à tua direita", centro:(rumo+90)%360},
+    {nome:"atrás de ti", centro:(rumo+180)%360},
+  ];
+  const fora=[];
+  for(const s of setores){
+    let melhor=null, melhorScore=-1e9;
+    for(const a of arts){
+      const t=norm(a.title);
+      if(usados.has(t)||S.ditos.has(a.title)) continue;
+      if(VETO.some(v=>t.includes(v))) continue;
+      const p=pags[a.pageid]||{};
+      if(!p.extract||p.extract.length<120) continue;
+      const diff=anguloEntre(rumoG(lat,lon,a.lat,a.lon),s.centro);
+      if(diff>50) continue;                          // fora do sector, não conta
+      const score=p.extract.length-a.dist*3-diff*4;   // perto, bem centrado, com texto
+      if(score>melhorScore){melhorScore=score; melhor={a,p};}
+    }
+    if(melhor){
+      usados.add(norm(melhor.a.title));
+      fora.push({chave:melhor.a.title,
+        texto:`${s.nome}, a ${Math.round(melhor.a.dist)} metros: ${melhor.a.title}. ${frases(melhor.p.extract,2)}`});
+    }
+  }
+  return fora;
+}
+
 async function canalHistoria(f){
   const n=[1,3,5][S.detalhe.HISTORIA-1];
   const fora=f.escolhidos.map(e=>({chave:e.titulo, texto:`${e.titulo}. ${frases(e.texto,n)}`}));
@@ -763,6 +802,17 @@ async function canalHistoria(f){
       for(const it of await patrimonioCML(f.lat,f.lon,raio))
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património CML:",e); }
+  }
+  // a pé, se a frente veio pobre em novidades, olha em volta — sem repetir
+  // nada do que já foi escolhido acima nem do que já ouviste antes
+  if(f.modo==="pe"&&f.rumo!=null){
+    const novosAteAqui=fora.filter(x=>!S.ditos.has(x.chave)).length;
+    if(novosAteAqui<2){
+      try{
+        const volta=await olharEmVolta(f.latAtual,f.lonAtual,f.rumo,fora.map(x=>norm(x.chave)));
+        for(const it of volta) if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
+      }catch(e){ console.warn("olhar em volta:",e); }
+    }
   }
   if(S.extra.gente){
     const qids=f.base.map(e=>e.qid).filter(Boolean).slice(0,2);
@@ -1337,7 +1387,8 @@ async function anunciar(lat,lon){
     // a freguesia/concelho tem quase sempre artigo em português — não
     // herda a língua da pesquisa (por vezes inglesa) do monumento vizinho
     const base=await artigosLocalidade(local,pla,plo,"pt");
-    const f={local,escolhidos,base,lang:"pt",todos:todos||[],lat:pla,lon:plo,modo};
+    const f={local,escolhidos,base,lang:"pt",todos:todos||[],lat:pla,lon:plo,modo,
+              latAtual:lat,lonAtual:lon,rumo:S.rumo};
     $("#chipLocal").textContent=local.linha;
 
     let pre="";
