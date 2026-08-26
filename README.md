@@ -6,6 +6,41 @@ Três programas, três perguntas:
 2. **`companheiro.py`** — funciona como companheiro contínuo, sem destino, com voz? (Sim.)
 3. **`webapp/`** — corre num smartphone, sem loja de apps? (Sim — ver abaixo.)
 
+## Fase 4 do PLANO-EXECUCAO.md — concluída (agosto 2026)
+
+Rádio e podcasts a tocar dentro da própria app, com *ducking* automático
+quando o companheiro fala, controlos no ecrã de bloqueio, e uma oferta
+proactiva quando não há novidades. Honestidade primeiro: uma webapp não
+consegue controlar o Spotify de outra app nem navegar lá dentro — por
+isso o caminho principal é tocar tudo cá dentro, não "ligar-se" a apps
+externas.
+
+- **Rádio**: directório aberto `radio-browser.info` (363 estações
+  portuguesas, testado ao vivo) — filtra automaticamente os streams
+  `.m3u8`/HLS que o Chrome não toca sem biblioteca extra. Testei 5
+  estações reais: RFM, Rádio Observador e Rádio Renascença tocam de
+  imediato; Antena 1 (só tinha stream `.m3u8`) foi correctamente excluída.
+- **Podcasts**: guarda-se os teus feeds RSS em ⚙. Testei com um feed real
+  — *Extremamente Desagradável*, o podcast mais ouvido de Portugal — e
+  confirmei que o áudio toca directamente, sem proxy (só a leitura do
+  texto do feed passa pelas mesmas regras de CORS do resto da app; o
+  próprio ficheiro de áudio não). A posição fica guardada e retoma entre
+  sessões — testei a sério: gravei aos 42s, recarreguei a página, retomou
+  aos 43,7s.
+- **Ducking real**: toquei uma rádio a sério e confirmei o volume a descer
+  de 1 para 0,15 quando o companheiro fala, e a voltar a 1 no fim.
+- **Oferta proactiva**: ao fim de 2 anúncios seguidos sem nada de novo (e
+  sem áudio já a tocar), pergunta se queres rádio ou podcast — no máximo
+  uma vez por hora. Ao testar apanhei uma supressão a funcionar
+  correctamente que pareceu à primeira vista uma falha: a segunda
+  tentativa de teste, na mesma hora real, ficou muda de propósito.
+- **Handoff Spotify**: avisa sempre por voz antes de tentar abrir o
+  Spotify, com 2,5s de intervalo para o aviso ser mesmo ouvido antes de
+  sair da app — testado a confirmar a ordem exacta dos eventos.
+- Testado: 13/14 da regressão (1 inconclusivo, mesma causa externa já
+  documentada na Fase 2) e 5/5 dos critérios de aceitação, com rádio e
+  podcast reais a tocar durante os testes — não simulado.
+
 ## Fase 2 do PLANO-EXECUCAO.md — concluída (agosto 2026)
 
 Modo corrida (jogging), bicicleta, percursos pedestres/ciclovias do OSM, e
