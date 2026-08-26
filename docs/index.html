@@ -162,6 +162,18 @@
     <option value="fr-FR">Français</option>
   </select></div>
 
+  <h3>Áudio de fundo</h3>
+  <p style="color:var(--meia);font-size:13px">Rádio e podcasts tocam dentro da própria app — baixa o volume sozinha quando o companheiro fala, e volta a subir a seguir. Diz «rádio» ou «podcast» a qualquer momento, sem olhar para o ecrã.</p>
+  <div class="linha"><button id="bTocaRadio" style="flex:1;padding:10px;border:0;border-radius:10px;background:#0d1219;color:var(--tinta);font-weight:600;font-size:14px">🔊 Tocar rádio</button></div>
+  <div id="listaPodcasts" style="margin-top:8px"></div>
+  <div class="linha" style="gap:6px">
+    <input id="novoPodcastNome" placeholder="Nome (ex: Extremamente Desagradável)" style="flex:1;background:#0d1219;color:var(--tinta);border:1px solid #2a3547;border-radius:8px;padding:7px 8px;font-size:13px">
+  </div>
+  <div class="linha" style="gap:6px">
+    <input id="novoPodcastUrl" placeholder="URL do feed RSS" style="flex:1;background:#0d1219;color:var(--tinta);border:1px solid #2a3547;border-radius:8px;padding:7px 8px;font-size:13px">
+    <button id="bAddPodcast" style="padding:7px 12px;border:0;border-radius:8px;background:var(--acento);color:#06111f;font-weight:700;font-size:13px">+</button>
+  </div>
+
   <div class="linha" style="margin-top:14px"><button id="bFechaDefs" style="width:100%;padding:12px;border:0;border-radius:10px;background:var(--acento);color:#06111f;font-weight:700;font-size:15px">Fechar</button></div>
 </div></div>
 
@@ -259,6 +271,8 @@ const S = {
   ultimoConcelho:null, ultimaRua:null, ditos:new Set(), ultimoTexto:"",
   saltos:{}, ultimoAnuncio:null,     // {canal,gancho,resto} — para "conta mais"
   modo:"pe", _modoPendente:null, _modoPendenteDesde:0,   // histerese de modo
+  podcasts:[], audioFundo:null,      // {tipo:"radio"|"podcast", nome, indice}
+  semNovidadesSeguidas:0,
 };
 const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
                DEMOGRAFIA:"números", ACTUALIDADE:"notícias"};
@@ -266,7 +280,7 @@ const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
 function guardaPrefs(){
   localStorage.setItem("cv-prefs", JSON.stringify(
     {canal:S.canal, ativos:S.ativos, detalhe:S.detalhe, demo:S.demo,
-     extra:S.extra, lingua:S.lingua}));
+     extra:S.extra, lingua:S.lingua, podcasts:S.podcasts}));
 }
 function lePrefs(){
   try{
@@ -274,6 +288,7 @@ function lePrefs(){
     Object.assign(S.ativos, p.ativos||{}); Object.assign(S.detalhe, p.detalhe||{});
     Object.assign(S.demo, p.demo||{}); Object.assign(S.extra, p.extra||{});
     if(p.canal&&NOMES[p.canal]) S.canal=p.canal; if(p.lingua) S.lingua=p.lingua;
+    if(Array.isArray(p.podcasts)) S.podcasts=p.podcasts;
   }catch(e){}
 }
 
@@ -284,7 +299,7 @@ function lePrefs(){
    pesos      → interesse aprendido por canal (salta = desce; ouvir = sobe)  */
 const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho",
              "agosto","setembro","outubro","novembro","dezembro"];
-let M={ditos:{}, visitas:{}, entidades:{}, pesos:{}};
+let M={ditos:{}, visitas:{}, entidades:{}, pesos:{}, podcast:null};   // podcast: {url,titulo,indice,posicao}
 try{ Object.assign(M, JSON.parse(localStorage.getItem("cv-mem")||"{}")); }catch(e){}
 S.ditos=new Set(Object.keys(M.ditos));
 
@@ -1429,6 +1444,146 @@ async function narraIA(texto){
   }catch(e){ console.warn("narraIA:",e); return texto; }
 }
 
+/* ═══════════════════ áudio de fundo: rádio e podcasts ═══════════════════
+   Uma webapp não consegue controlar o Spotify/YouTube Music de outra app
+   nem navegar lá dentro — por isso o caminho principal é tocar rádio e
+   podcasts AQUI DENTRO, num único <audio> partilhado, com "ducking"
+   (baixa o volume quando o companheiro fala) e Media Session (controlos
+   no ecrã de bloqueio/auscultadores, para nunca ser preciso olhar). */
+let _player=null, RADIOS=[], _radioCarregada=false, _episodiosCache={};
+function _garantePlayer(){
+  if(_player) return _player;
+  _player=new Audio(); _player.preload="none"; _player.volume=1;
+  _player.addEventListener("error",()=>{
+    console.warn("áudio de fundo falhou:", _player.error&&_player.error.code);
+    if(S.audioFundo&&S.audioFundo.tipo==="radio") outraEstacao(true);  // salta sozinho para a seguinte
+  });
+  return _player;
+}
+function duckAudio(abaixar){
+  if(_player&&S.audioFundo) _player.volume = abaixar?0.15:1;
+}
+function configuraMediaSession(titulo,artista){
+  if(!("mediaSession" in navigator)) return;
+  try{
+    navigator.mediaSession.metadata=new MediaMetadata({title:titulo, artist:artista, album:"Companheiro de Viagem"});
+    navigator.mediaSession.setActionHandler("play",()=>_player&&_player.play());
+    navigator.mediaSession.setActionHandler("pause",()=>_player&&_player.pause());
+    navigator.mediaSession.setActionHandler("nexttrack",()=>{
+      if(S.audioFundo&&S.audioFundo.tipo==="radio") outraEstacao();
+      else if(S.audioFundo&&S.audioFundo.tipo==="podcast") proximoEpisodio();
+    });
+  }catch(e){ console.warn("mediaSession:",e); }
+}
+
+/* rádio — directório aberto radio-browser.info, filtra fora o que o Chrome
+   não toca nativamente (.m3u8/HLS precisa de biblioteca extra, não usamos) */
+async function carregaRadios(){
+  if(_radioCarregada) return RADIOS;
+  _radioCarregada=true;
+  try{
+    const d=await busca("https://de1.api.radio-browser.info/json/stations/bycountry/portugal");
+    const vistos=new Set();
+    RADIOS=(d||[])
+      .filter(s=>s.url_resolved&&s.name&&!/\.m3u8(\?|$)/i.test(s.url_resolved))
+      .sort((a,b)=>(b.votes||0)-(a.votes||0))
+      .filter(s=>{ const k=norm(s.name); if(vistos.has(k)) return false; vistos.add(k); return true; })
+      .slice(0,15);
+  }catch(e){ console.warn("radio-browser:",e); RADIOS=[]; }
+  return RADIOS;
+}
+async function tocaRadio(indice){
+  const lista=await carregaRadios();
+  if(!lista.length){ dizJa("Não encontrei rádios agora."); return; }
+  let i=indice!=null?indice:(S.audioFundo&&S.audioFundo.tipo==="radio"?S.audioFundo.indice:0);
+  i=((i%lista.length)+lista.length)%lista.length;
+  const estacao=lista[i], el=_garantePlayer();
+  el.pause(); el.src=estacao.url_resolved; el.volume=1;
+  try{ await el.play(); }
+  catch(e){ console.warn("rádio play:",e); dizJa("Não consegui ligar essa rádio."); return; }
+  S.audioFundo={tipo:"radio", indice:i, nome:estacao.name};
+  configuraMediaSession(estacao.name,"Rádio");
+  regista("cmd",`🔊 Rádio: ${estacao.name}`);
+}
+function outraEstacao(silencioso){
+  if(!S.audioFundo||S.audioFundo.tipo!=="radio"){ if(!silencioso) dizJa("Não há rádio a tocar."); return; }
+  tocaRadio(S.audioFundo.indice+1);
+}
+function paraAudioFundo(){
+  if(_player){ _player.pause(); }
+  S.audioFundo=null;
+  if("mediaSession" in navigator) navigator.mediaSession.playbackState="none";
+}
+
+/* podcasts — o utilizador guarda os URLs dos feeds RSS em ⚙ (dos seus
+   próprios podcasts). O ÁUDIO em si toca sempre directo (um <audio src>
+   não passa pelas regras de CORS do fetch()) — só o TEXTO do feed, para
+   extrair os episódios, pode precisar do mesmo proxy que já usamos nas
+   notícias, quando o servidor do podcast bloqueia leitura directa. */
+async function episodiosDoFeed(url){
+  if(_episodiosCache[url]) return _episodiosCache[url];
+  let xml=await busca(url,"texto");
+  let viaProxy=false;
+  if(!xml||!/<rss|<feed/i.test(xml.slice(0,200))){
+    xml=await textoViaProxy(url); viaProxy=true;
+  }
+  if(!xml) return [];
+  try{
+    const doc=new DOMParser().parseFromString(xml,"text/xml");
+    if(doc.querySelector("parsererror")) return [];
+    const titulo=doc.querySelector("channel > title")?.textContent||"Podcast";
+    const itens=[...doc.querySelectorAll("item")].map(it=>({
+      titulo: it.querySelector("title")?.textContent||"Episódio",
+      audio: it.querySelector("enclosure")?.getAttribute("url")||"",
+    })).filter(e=>e.audio);
+    const fora={titulo, itens, viaProxy};
+    _episodiosCache[url]=fora;
+    return fora;
+  }catch(e){ console.warn("feed podcast:",e); return []; }
+}
+async function tocaPodcast(){
+  if(!S.podcasts.length){ dizJa("Ainda não tens nenhum podcast guardado — adiciona um em preferências."); return; }
+  // retoma o último ouvido, se houver; senão o primeiro da lista
+  const guardado=M.podcast;
+  const feed=guardado?S.podcasts.find(p=>p.url===guardado.url):S.podcasts[0];
+  const alvo=feed||S.podcasts[0];
+  const dados=await episodiosDoFeed(alvo.url);
+  if(!dados.itens||!dados.itens.length){ dizJa(`Não consegui ler os episódios de ${alvo.nome}.`); return; }
+  const indice=(guardado&&guardado.url===alvo.url)?guardado.indice:0;
+  const ep=dados.itens[indice]||dados.itens[0];
+  const el=_garantePlayer();
+  el.pause(); el.src=ep.audio; el.volume=1;
+  if(guardado&&guardado.url===alvo.url&&guardado.posicao) el.currentTime=guardado.posicao;
+  try{ await el.play(); }
+  catch(e){ console.warn("podcast play:",e); dizJa("Não consegui tocar esse episódio."); return; }
+  S.audioFundo={tipo:"podcast", nome:ep.titulo};
+  M.podcast={url:alvo.url, titulo:ep.titulo, indice, posicao:el.currentTime||0};
+  guardaMemoria();
+  configuraMediaSession(ep.titulo, dados.titulo);
+  regista("cmd",`🎙 Podcast: ${ep.titulo}`);
+  // guarda a posição periodicamente, para retomar mesmo que a app feche
+  el.ontimeupdate=()=>{
+    if(M.podcast&&M.podcast.url===alvo.url){ M.podcast.indice=indice; M.podcast.posicao=el.currentTime; guardaMemoria(); }
+  };
+}
+async function proximoEpisodio(){
+  if(!S.audioFundo||S.audioFundo.tipo!=="podcast"||!M.podcast){ dizJa("Não há podcast a tocar."); return; }
+  M.podcast.indice=(M.podcast.indice||0)+1; M.podcast.posicao=0;
+  guardaMemoria();
+  await tocaPodcast();
+}
+
+/* handoff honesto para o Spotify — avisa SEMPRE antes de sair da app,
+   porque a partir daí o companheiro deixa de conseguir falar */
+function abreSpotify(){
+  dizJa("Vou abrir o Spotify — a partir daí deixo de poder falar contigo; volta à app para me ouvires.");
+  setTimeout(()=>{
+    const agora=Date.now();
+    window.location.href="spotify:";
+    setTimeout(()=>{ if(Date.now()-agora<1500) window.open("https://open.spotify.com","_blank"); },800);
+  },2500);   // dá tempo ao aviso a ser dito antes de sair da app
+}
+
 /* ═══════════════════ voz (síntese) ═══════════════════ */
 let vozEscolhida=null, filaFala=[], aFalar=false, falaCanal=null, falaCancelada=false;
 function escolheVoz(){
@@ -1446,12 +1601,13 @@ function _falaAgora(texto,canal){
   if(vozEscolhida) u.voice=vozEscolhida;
   u.lang=S.lingua; u.rate=1.0;
   falaCanal=canal||null; falaCancelada=false;
-  u.onstart=()=>{ pausaOuvido(); };
+  u.onstart=()=>{ pausaOuvido(); duckAudio(true); };
   u.onend=u.onerror=()=>{
     // ouvir até ao fim é o sinal positivo mais honesto que existe
     if(!falaCancelada&&falaCanal){ reforca(falaCanal,1.04); S.saltos[falaCanal]=0; }
     aFalar=false; falaCanal=null; retomaOuvido();
     if(filaFala.length){ aFalar=true; const p=filaFala.shift(); _falaAgora(p.t,p.c); }
+    else duckAudio(false);      // só repõe o volume quando a fila esvazia de vez
   };
   aFalar=true; speechSynthesis.speak(u);
 }
@@ -1536,6 +1692,16 @@ const COMANDOS=[
   // "continua essa história" seria apanhado por esse comando primeiro
   [/conta mais|desenvolve|continua essa/, ()=>contaMais()],
   [/conta menos|mais curto|abrevia/,      ()=>contaMenos()],
+  // áudio de fundo — as frases de parar/mudar têm de vir ANTES das
+  // genéricas "radio"/"podcast" a seguir, e "proximo episodio" tem de vir
+  // ANTES do "salta|proximo|passa" mais abaixo, pela mesma razão de sempre
+  [/para a radio|desliga a radio/,      ()=>{paraAudioFundo(); regista("cmd","Rádio desligada.");}],
+  [/outra estacao|muda de estacao/,     ()=>outraEstacao()],
+  [/\bradio\b/,                          ()=>tocaRadio()],
+  [/para o podcast|desliga o podcast/,  ()=>{paraAudioFundo(); regista("cmd","Podcast parado.");}],
+  [/proximo episodio|episodio seguinte/, ()=>proximoEpisodio()],
+  [/podcast/,                           ()=>tocaPodcast()],
+  [/abre o spotify|abrir spotify/,      ()=>abreSpotify()],
   [/silencio|cala/,          ()=>{S.silencio=true; salta(); pintaSom(); regista("cmd","Silêncio ligado.");}],
   [/\bfala\b|continua|\bsom\b/, ()=>{S.silencio=false; pintaSom(); dizJa("Estou de volta.");}],
   [/mais detalhe/,           ()=>{S.detalhe[S.canal]=Math.min(3,S.detalhe[S.canal]+1); guardaPrefs(); pintaDefs(); dizJa(`Mais detalhe em ${NOMES[S.canal]}.`);}],
@@ -1551,7 +1717,7 @@ const COMANDOS=[
   [/esquece (a )?memoria/,   ()=>{$("#bEsquece").click(); dizJa("Esqueci tudo o que sabia de ti.");}],
   [/salta|proximo|passa/,    ()=>{salta(); regista("cmd","Saltado.");}],
   [/repete/,                 ()=>{if(S.ultimoTexto) dizJa(S.ultimoTexto);}],
-  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, conta mais, conta menos, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, ou repete.")],
+  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, conta mais, conta menos, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, repete, rádio, outra estação, podcast, próximo episódio, ou abre o Spotify.")],
 ];
 function comando(dito){
   const d=norm(dito);
@@ -1702,6 +1868,7 @@ async function anunciar(lat,lon){
     }
     const n=await narrar(f,pla,plo,modo);
     if(n||pre){
+      S.semNovidadesSeguidas=0;
       // fala-se só o gancho; o resto (se houver) fica à espera de "conta mais"
       let txt=paraVoz(pre+((n&&n.gancho)||""));
       txt=paraVoz(await narraIA(txt));    // IA local reescreve; se falhar, fica igual
@@ -1709,6 +1876,19 @@ async function anunciar(lat,lon){
       S.ultimoTexto=txt;
       S.ultimoAnuncio={canal:(n&&n.canal)||null, gancho:txt, resto:paraVoz((n&&n.resto)||"")};
       diz(txt,(n&&n.canal)||null);
+    }else{
+      // sossegado por aqui — ao fim de 2 vezes seguidas, oferece rádio/podcast
+      // (nunca se já houver áudio de fundo a tocar; no máximo uma vez por hora)
+      S.semNovidadesSeguidas=(S.semNovidadesSeguidas||0)+1;
+      if(S.semNovidadesSeguidas>=2&&!S.audioFundo){
+        const chave=`oferta-audio:${new Date().toISOString().slice(0,13)}`;   // por hora
+        if(!S.ditos.has(chave)){
+          marcaDito(chave);
+          const t="Por aqui está sossegado. Queres rádio ou um podcast? Diz «rádio» ou «podcast».";
+          regista("cmd",t); diz(t,null);
+          S.semNovidadesSeguidas=0;
+        }
+      }
     }
     // pré-carregamento: aquece a cache para a posição seguinte enquanto se
     // fala — sem esperar por isto (fire-and-forget, nunca bloqueia o anúncio)
@@ -1792,12 +1972,35 @@ function pintaDefs(){
   }).join("<br>");
   const nV=Object.keys(M.visitas).length, nF=Object.keys(M.ditos).length;
   $("#perfilViagens").textContent=nV?`Memória: ${nV} concelhos visitados, ${nF} factos já contados.`:"Ainda sem viagens memorizadas.";
+  pintaPodcasts();
+}
+function pintaPodcasts(){
+  const alvo=$("#listaPodcasts"); if(!alvo) return;
+  if(!S.podcasts.length){ alvo.innerHTML=`<p style="color:var(--meia);font-size:13px">Ainda sem podcasts guardados.</p>`; return; }
+  alvo.innerHTML=S.podcasts.map((p,i)=>
+    `<div class="linha"><span style="flex:1;font-size:14px">🎙 ${p.nome}</span>`+
+    `<button data-tocar="${i}" style="padding:5px 10px;border:0;border-radius:8px;background:#0d1219;color:var(--tinta);font-size:13px">▶</button>`+
+    `<button data-remover="${i}" style="padding:5px 10px;border:0;border-radius:8px;background:#0d1219;color:var(--aviso);font-size:13px">✕</button></div>`
+  ).join("");
+  alvo.querySelectorAll("[data-tocar]").forEach(b=>b.onclick=()=>{
+    M.podcast={url:S.podcasts[+b.dataset.tocar].url, indice:0, posicao:0}; guardaMemoria(); tocaPodcast();
+  });
+  alvo.querySelectorAll("[data-remover]").forEach(b=>b.onclick=()=>{
+    S.podcasts.splice(+b.dataset.remover,1); guardaPrefs(); pintaPodcasts();
+  });
 }
 
 document.querySelectorAll("[data-canal]").forEach(b=>
   b.onclick=()=>{S.ativos[b.dataset.canal]=true; mudaCanal(b.dataset.canal);});
 $("#bSalta").onclick=()=>{salta(); regista("cmd","Saltado.");};
 $("#bContaMais").onclick=()=>contaMais();
+$("#bTocaRadio").onclick=()=>tocaRadio();
+$("#bAddPodcast").onclick=()=>{
+  const nome=$("#novoPodcastNome").value.trim(), url=$("#novoPodcastUrl").value.trim();
+  if(!nome||!url){ return; }
+  S.podcasts.push({nome,url}); guardaPrefs(); pintaPodcasts();
+  $("#novoPodcastNome").value=""; $("#novoPodcastUrl").value="";
+};
 $("#bSom").onclick=()=>{S.silencio=!S.silencio; if(S.silencio) salta(); pintaSom();};
 $("#bMic").onclick=()=>{
   if(!recDisponivel){regista("cmd","Reconhecimento de voz indisponível neste browser."); return;}
