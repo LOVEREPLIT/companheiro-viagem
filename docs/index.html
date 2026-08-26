@@ -41,7 +41,7 @@
   }
   nav .fila{display:grid; gap:6px}
   nav .fila.canais{grid-template-columns:repeat(5,1fr)}
-  nav .fila.icones{grid-template-columns:repeat(4,1fr)}
+  nav .fila.icones{grid-template-columns:repeat(5,1fr)}
   nav button{
     border:0; border-radius:10px; background:#0d1219; color:var(--meia);
     padding:11px 4px; font-size:13.5px; font-weight:600; cursor:pointer;
@@ -100,6 +100,7 @@
   </div>
   <div class="fila icones">
     <button id="bSalta" class="icone" title="saltar">⏭</button>
+    <button id="bContaMais" class="icone" title="conta mais">⏵</button>
     <button id="bMic" class="icone" title="microfone">🎙</button>
     <button id="bSom" class="icone" title="silêncio">🔊</button>
     <button id="bDefs" class="icone" title="preferências">⚙️</button>
@@ -241,7 +242,8 @@ function paraVoz(t){
     .replace(/km²/g,"quilómetros quadrados")
     .replace(/\b(\d+) m\b/g,"$1 metros").replace(/\bkm\/h\b/g,"quilómetros por hora")
     .replace(/[·—↳]/g,", ").replace(/\s+/g," ").trim();
-  if(t.length>750){ const c=t.slice(0,750); t=c.slice(0,c.lastIndexOf(".")+1)||c; }
+  const limite=limitesFala().limite;      // depende do modo (pé/carro) — ver mais abaixo
+  if(t.length>limite){ const c=t.slice(0,limite); t=c.slice(0,c.lastIndexOf(".")+1)||c; }
   return t;
 }
 
@@ -255,7 +257,7 @@ const S = {
   lingua:"pt-PT",
   veloc:0, rumo:null, ultimaPos:null, dAcum:0, ultimoAnuncioD:-1e12,
   ultimoConcelho:null, ultimaRua:null, ditos:new Set(), ultimoTexto:"",
-  saltos:{},
+  saltos:{}, ultimoAnuncio:null,     // {canal,gancho,resto} — para "conta mais"
 };
 const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
                DEMOGRAFIA:"números", ACTUALIDADE:"notícias"};
@@ -1296,6 +1298,16 @@ async function narrar(f,lat,lon,modo){
        .sort((a,b)=>(M.pesos[b]||1)-(M.pesos[a]||1))
   ].filter(c=>S.ativos[c]);
   const concelho=f.local.concelho||"";
+  const lim=limitesFala();
+  // parte um texto completo em gancho (o que se diz já) e resto (só a
+  // pedido, via "conta mais") — sempre a partir do texto NORMALIZADO,
+  // para o corte por comprimento bater certo com o que frases() devolve
+  const parte=texto=>{
+    const norm=(texto||"").replace(/\s+/g," ").trim();
+    const gancho=frases(norm,lim.gancho);
+    const resto=norm.slice(gancho.length).trim();
+    return {texto:norm, gancho, resto};
+  };
   for(const c of ordem){
     let itens=[];
     try{ itens=await CONSTRUTOR[c](f); }catch(e){ console.warn(c,e); }
@@ -1312,14 +1324,14 @@ async function narrar(f,lat,lon,modo){
       // de assunto em silêncio (foi o que confundiu sabores com história)
       if(c!==S.canal) intro=`Sem novidades de ${NOMES[S.canal]} por aqui — `+
                              `sobre ${NOMES[c]}: `+intro;
-      return {canal:c, texto:intro+it.texto+liga};
+      return {canal:c, ...parte(intro+it.texto+liga)};
     }
   }
   if(modo==="pe"){
     for(const it of await canalPOI(f,lat,lon)){
       if(S.ditos.has(it.chave)) continue;
       marcaDito(it.chave);
-      return {canal:"HISTORIA", texto:it.texto};
+      return {canal:"HISTORIA", ...parte(it.texto)};
     }
   }
   return null;
@@ -1402,6 +1414,10 @@ function dizJa(texto){                     // confirmações de comandos: imedia
   try{speechSynthesis.cancel();}catch(e){}
   aFalar=false; if(!S.silencio) _falaAgora(texto,null);
 }
+function interrompeFala(){
+  filaFala=[]; falaCancelada=true;
+  try{speechSynthesis.cancel();}catch(e){} aFalar=false;
+}
 function salta(){
   // saltar é o sinal negativo: o interesse nesse canal desce
   if(falaCanal){
@@ -1416,8 +1432,25 @@ function salta(){
       }
     }
   }
-  filaFala=[]; falaCancelada=true;
-  try{speechSynthesis.cancel();}catch(e){} aFalar=false;
+  interrompeFala();
+}
+/* "conta mais": o oposto de saltar — pede o resto do que ficou por dizer */
+function contaMais(){
+  const ua=S.ultimoAnuncio;
+  if(!ua||!ua.resto){ dizJa("Não tenho mais sobre isto."); return; }
+  if(ua.canal) reforca(ua.canal,1.08);
+  dizJa(ua.resto);
+  S.ultimoAnuncio={...ua, resto:""};   // já foi dito — não repetir a um novo "conta mais"
+}
+/* "conta menos": interrompe e fica mais breve daqui em diante, mas SEM
+   contar como salto (não deve disparar a auto-troca de canal do salta()) */
+function contaMenos(){
+  const canal=falaCanal||S.canal;
+  interrompeFala();
+  S.detalhe[canal]=Math.max(1,(S.detalhe[canal]||2)-1);
+  reforca(canal,0.92);
+  guardaPrefs(); pintaDefs();
+  dizJa("Vou ser mais breve.");
 }
 
 /* ═══════════════════ ouvido (menu falado) ═══════════════════ */
@@ -1444,6 +1477,10 @@ const COMANDOS=[
   [/economia/,               ()=>mudaCanal("ECONOMIA")],
   [/demografia|estatistic|numeros/, ()=>mudaCanal("DEMOGRAFIA")],
   [/atualidade|noticias/,    ()=>mudaCanal("ACTUALIDADE")],
+  // têm de vir ANTES do "continua"/"fala" avulso a seguir, senão
+  // "continua essa história" seria apanhado por esse comando primeiro
+  [/conta mais|desenvolve|continua essa/, ()=>contaMais()],
+  [/conta menos|mais curto|abrevia/,      ()=>contaMenos()],
   [/silencio|cala/,          ()=>{S.silencio=true; salta(); pintaSom(); regista("cmd","Silêncio ligado.");}],
   [/\bfala\b|continua|\bsom\b/, ()=>{S.silencio=false; pintaSom(); dizJa("Estou de volta.");}],
   [/mais detalhe/,           ()=>{S.detalhe[S.canal]=Math.min(3,S.detalhe[S.canal]+1); guardaPrefs(); pintaDefs(); dizJa(`Mais detalhe em ${NOMES[S.canal]}.`);}],
@@ -1459,7 +1496,7 @@ const COMANDOS=[
   [/esquece (a )?memoria/,   ()=>{$("#bEsquece").click(); dizJa("Esqueci tudo o que sabia de ti.");}],
   [/salta|proximo|passa/,    ()=>{salta(); regista("cmd","Saltado.");}],
   [/repete/,                 ()=>{if(S.ultimoTexto) dizJa(S.ultimoTexto);}],
-  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, ou repete.")],
+  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, conta mais, conta menos, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, ou repete.")],
 ];
 function comando(dito){
   const d=norm(dito);
@@ -1479,6 +1516,11 @@ function mudaCanal(c){
 function modoAtual(){ return S.veloc>3?"carro":"pe"; }
 function horizonte(){ return modoAtual()==="carro"?240:60; }
 function passo(){ return modoAtual()==="carro"?4000:130; }
+// quanto se fala de cada vez: a pé há tempo para ouvir mais; de carro,
+// frases curtas — o resto fica disponível por "conta mais"
+function limitesFala(){
+  return modoAtual()==="carro" ? {gancho:1, limite:450} : {gancho:2, limite:750};
+}
 
 async function novaPosicao(lat,lon,tMs,velGps){
   const u=S.ultimaPos;
@@ -1543,10 +1585,22 @@ async function anunciar(lat,lon){
     }
     const n=await narrar(f,pla,plo,modo);
     if(n||pre){
-      let txt=paraVoz(pre+((n&&n.texto)||""));
+      // fala-se só o gancho; o resto (se houver) fica à espera de "conta mais"
+      let txt=paraVoz(pre+((n&&n.gancho)||""));
       txt=paraVoz(await narraIA(txt));    // IA local reescreve; se falhar, fica igual
       regista((n&&n.canal)||"LOCAL",txt);
-      S.ultimoTexto=txt; diz(txt,(n&&n.canal)||null);
+      S.ultimoTexto=txt;
+      S.ultimoAnuncio={canal:(n&&n.canal)||null, gancho:txt, resto:paraVoz((n&&n.resto)||"")};
+      diz(txt,(n&&n.canal)||null);
+    }
+    // pré-carregamento: aquece a cache para a posição seguinte enquanto se
+    // fala — sem esperar por isto (fire-and-forget, nunca bloqueia o anúncio)
+    if(aFalar&&S.rumo!=null){
+      const adiante=S.veloc*horizonte()+passo();
+      if(adiante>50){
+        const [nlat,nlon]=avanca(lat,lon,S.rumo,adiante);
+        nominatim(nlat,nlon).then(()=>escolher(nlat,nlon,modo)).catch(()=>{});
+      }
     }
   }catch(e){ console.warn("anúncio falhou:",e); }
   finally{ S.ultimoAnuncioD=S.dAcum; S.anunciando=false; }
@@ -1626,6 +1680,7 @@ function pintaDefs(){
 document.querySelectorAll("[data-canal]").forEach(b=>
   b.onclick=()=>{S.ativos[b.dataset.canal]=true; mudaCanal(b.dataset.canal);});
 $("#bSalta").onclick=()=>{salta(); regista("cmd","Saltado.");};
+$("#bContaMais").onclick=()=>contaMais();
 $("#bSom").onclick=()=>{S.silencio=!S.silencio; if(S.silencio) salta(); pintaSom();};
 $("#bMic").onclick=()=>{
   if(!recDisponivel){regista("cmd","Reconhecimento de voz indisponível neste browser."); return;}
