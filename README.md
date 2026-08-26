@@ -6,6 +6,121 @@ Três programas, três perguntas:
 2. **`companheiro.py`** — funciona como companheiro contínuo, sem destino, com voz? (Sim.)
 3. **`webapp/`** — corre num smartphone, sem loja de apps? (Sim — ver abaixo.)
 
+## Fase 6 do PLANO-EXECUCAO.md — concluída (agosto 2026)
+
+Pré-viagem com destino real: escreves para onde vais, ele conta o que há pelo
+caminho antes de partires.
+
+- **UI**: "Simulação (teste no PC)" passou a "Pré-viagem 🛋 (ouve o caminho
+  antes de o fazeres)". Novos campos "Destino" e "Partida" (Partida vazio =
+  GPS actual); as rotas de teste antigas continuam disponíveis por baixo,
+  para quem não escrever destino — nada do que já existia foi removido.
+- **Geocodificação e percurso**: Nominatim `/search?countrycodes=pt` resolve
+  o texto em coordenadas (testei "Évora" → a 50 metros do centro real). O
+  percurso é RECTO, por interpolação linear entre partida e destino (8
+  pontos) — a UI diz sempre "percurso aproximado em linha recta", sem
+  fingir que há estradas reais. Velocidade: 25 m/s (carro) se a distância
+  em linha recta for >15 km, 1,4 m/s (a pé) se for mais curta.
+- **A regra de ouro, testada a sério**: corri Lisboa→Évora completo (turbo
+  200×) e confirmei `M.ditos` com 0 chaves novas no fim — nada do que se
+  disse na pré-viagem ficou na memória real. A seguir simulei um anúncio a
+  sério no mesmo sítio (Évora) e os mesmos temas puderam ser contados de
+  novo (5 factos novos em `M.ditos`, desta vez a sério). Também tratei
+  `M.visitas`, `M.colecoes`, `M.freguesias`, `M.stats` e `M.pesos` da mesma
+  forma — nenhum escreve durante uma pré-viagem (o plano só falava
+  explicitamente de `M.ditos`, mas a Fase 3 acrescentou estas outras
+  memórias depois de o plano estar escrito; alarguei a regra a todas por
+  a mesma razão de fundo: uma pré-viagem não é uma visita).
+- **Bug real encontrado e corrigido**: a primeira versão restaurava
+  `S.fonte`/`M` reais assim que a última posição simulada era processada —
+  mas um `anunciar()` ainda a meio de uma pesquisa assíncrona (por exemplo
+  a nova pesquisa à Wikisource, que pode fazer até 10 pedidos em série)
+  podia terminar DEPOIS dessa restauração e escrever na memória real na
+  mesma. Confirmei o bug (2 chaves a vazar para `M.ditos` num teste real)
+  e corrigi fazendo a restauração esperar por `S.anunciando===false` — a
+  mesma bandeira que já existia para o watchdog de segurança.
+- Testado: F6.1 (geocodificação), F6.2 (a regra de ouro, com o bug acima),
+  F6.3 (UI) — todos com dados e chamadas reais, não simulados.
+
+## Fase 5 do PLANO-EXECUCAO.md — concluída, com fontes descartadas (agosto 2026)
+
+Por ordem do plano — cada fonte só entrou depois de um `fetch()` real
+provar que existe e devolve o que promete (secção 7 do plano).
+
+### 6.1 Literatura geolocalizada — Wikisource (integrado)
+Excertos REAIS de obras em domínio público que mencionam o lugar, ditos
+como "Escreveu {autor}, em {obra}: «...»" dentro do canal HISTÓRIA. A
+pesquisa de texto integral (`pt.wikisource.org`, API igual à da
+Wikipédia) apanha muito lixo por si só: testei ao vivo com 11 termos reais
+e, sem filtros, "Leiria" devolvia uma lei municipal de São Paulo e "Braga"
+um catálogo tabular de cantigas medievais — nenhum dos dois é literatura.
+Os filtros que ficaram, todos genéricos (não por nome de obra):
+- excluir títulos que começam por "Lei", "Hino", "Decreto", "Resolução",
+  "Portaria" e páginas de sistema;
+- exigir uma ligação real a `Autor:` (rejeita "Vários"/"Anónimo") — é o
+  sinal estrutural que separa literatura de documento administrativo;
+- rejeitar excertos com muitos números/parênteses/"Capítulo" (cheiram a
+  índice, não a prosa);
+- rejeitar uma ocorrência do nome do lugar se a palavra anterior for
+  maiúscula e não for uma preposição de lugar (apanha "Delfim Guimarães"
+  ou "Pereira de Faro" — apelidos que por acaso são topónimos).
+Com estes filtros, 6 de 7 termos "difíceis" testados (Leiria, Sintra,
+Óbidos, Coimbra, Évora, mais tarde Guimarães e Porto) deram um excerto
+real e bem atribuído — Eça de Queirós sobre Leiria, Álvaro de Campos "Ao
+Volante" sobre Sintra, Florbela Espanca sobre Évora e Coimbra. **Limite
+conhecido e aceite**: "Braga" continua a devolver por vezes um índice de
+capítulos disfarçado — nomes de terra que são também apelidos portugueses
+comuns (Braga, Faro, Porto, Guimarães) continuam a ser um risco residual
+sem uma solução NLP mais pesada, que não se justifica para esta fase.
+Nunca inventa — nada encontrado de jeito devolve `null` e o canal
+simplesmente segue sem literatura nesse anúncio. Uma pesquisa por nome de
+lugar só é tentada UMA vez por sessão (mesmo mecanismo do `S.ditos`).
+
+### 6.2 SIPA / MatrizPCI (tentado, descartado)
+Ambos existem a sério, em domínios diferentes dos que o plano supunha
+(`imovel.patrimoniocultural.gov.pt`, não `sipa.dgpc.pt`; e
+`matrizpci.patrimoniocultural.gov.pt`, não `matrizpci.dgpc.pt`). Confirmei
+ao vivo, via a cadeia de proxy já existente (`r.jina.ai`), que uma ficha
+do SIPA se lê bem e tem texto histórico real e detalhado — testei 4 fichas
+reais (Castelo de Palmela, Igreja dos Clérigos, Igreja de Santa Maria de
+Tavira, Casa Havaneza) e a extracção de título+nota histórica foi limpa
+nas 4. O que **não existe**: nenhuma forma de pesquisar por localização —
+só um formulário HTML, sem API. Tentei uma alternativa: o Wikidata tem
+mesmo uma propriedade "SIPA ID" (P1700, confirmei no Castelo de Palmela,
+valor "4075") — mas esse ID pertence ao esquema ANTIGO do site
+`monumentos.gov.pt`, que confirmei estar mesmo fora do ar (todas as 3 vias
+de proxy falharam). Sem forma de ir de "onde estou" para "que ficha
+mostrar", não há como integrar isto para qualquer ponto do país — só para
+uma lista de sítios já conhecidos à partida, o que não é o espírito da
+app. Documentado e descartado, como o plano permite explicitamente.
+
+### 6.3 Mais câmaras com dados abertos
+- **Porto — integrado.** `opendata.porto.digital` (portal CKAN, não
+  ArcGIS Hub — mas serve o mesmo propósito) tem um CSV real de 61
+  monumentos com descrição em português, testado ao vivo: 49 monumentos
+  reais devolvidos num raio de 2 km da Torre dos Clérigos, incluindo a
+  própria Torre, o Arco de Sant'Ana, os Pilares da Ponte Pênsil. O CSV vem
+  num dialecto próprio (aspas simples, campos de texto em formato de
+  dicionário Python) — escrevi um parser dedicado para isto, testado
+  contra 7 registos reais antes de confiar nele.
+- **Coimbra, Braga, Guimarães, Évora, Faro — descartados.** Nenhum tem um
+  catálogo de dados abertos real com património ou toponímia. Guimarães
+  tem um portal de dados abertos real (`sig.cm-guimaraes.pt/dadosabertos`)
+  mas as suas 13 categorias são todas de equipamentos/administração, nada
+  de património. Braga só tem um visualizador de mapas, não um catálogo.
+  Évora tem uma referência a um serviço ArcGIS de terceiros que já não
+  existe (404 confirmado). Nenhum hub inventado — tudo verificado ao vivo
+  antes de descartar.
+
+### 6.4 Desemprego por concelho (IEFP) — descartado
+O catálogo `dados.gov.pt` só tem 2 conjuntos de dados ligados ao IEFP, sem
+nenhum ficheiro anexado (0% preenchido) e sem quebra por concelho — só
+agregados nacionais. Existem relatórios mensais reais em PDF directamente
+em iefp.pt, mas cada mês tem um URL com um identificador interno
+imprevisível (não é um padrão fixo que se possa construir), por isso não
+dá uma fonte estável para a app consultar sozinha. Descartado, como o
+plano permite quando a cadeia não fecha num dia de trabalho.
+
 ## Fase 3 do PLANO-EXECUCAO.md — concluída (agosto 2026)
 
 Interesses declarados, passaporte de território, colecções verificáveis,

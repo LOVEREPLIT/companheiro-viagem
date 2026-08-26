@@ -140,6 +140,7 @@
     <div class="linha"><span>Avisos IPMA e incêndios</span><input type="checkbox" data-extra="avisos" checked></div>
     <div class="linha"><span>Filhos da terra (figuras ilustres)</span><input type="checkbox" data-extra="gente" checked></div>
     <div class="linha"><span>Rua e bairro (a pé)</span><input type="checkbox" data-extra="rua" checked></div>
+    <div class="linha"><span>Literatura (Wikisource, excertos reais)</span><input type="checkbox" data-extra="leitura" checked></div>
   </div>
 
   <h3>Os meus interesses</h3>
@@ -196,17 +197,25 @@
      a seguir pela tua direção.</p>
   <div class="linha"><span>Posição</span><select id="selFonte">
     <option value="gps" selected>GPS real</option>
-    <option value="sim">Simulação (teste no PC)</option>
+    <option value="sim">Pré-viagem 🛋 (ouve o caminho antes de o fazeres)</option>
   </select></div>
-  <div class="linha" id="linhaRota" hidden><span>Rota simulada</span><select id="selRota">
-    <option value="a1">A1 Lisboa→Porto (carro)</option>
-    <option value="alentejo">Alentejo (carro)</option>
-    <option value="douro">Douro (carro)</option>
-    <option value="baixa-lisboa">Baixa de Lisboa (a pé)</option>
-  </select></div>
-  <div class="linha" id="linhaTurbo" hidden><span>Acelerar tempo</span><select id="selTurbo">
-    <option value="20">20×</option><option value="60" selected>60×</option><option value="200">200×</option>
-  </select></div>
+  <div id="blocoPreViagem" hidden>
+    <p style="color:var(--meia);font-size:13px">Escreve um destino para ouvires o que há pelo
+       caminho antes de partires — percurso aproximado em linha recta, sem dados de trânsito
+       nem estradas reais. Nada do que ouvires aqui fica guardado como visita a sério.</p>
+    <div class="linha"><span>Destino</span><input id="txtDestino" placeholder="ex: Évora" style="flex:1;background:#0d1219;color:var(--tinta);border:1px solid #2a3547;border-radius:8px;padding:7px 8px;font-size:13px"></div>
+    <div class="linha"><span>Partida</span><input id="txtPartida" placeholder="vazio = a tua posição actual (GPS)" style="flex:1;background:#0d1219;color:var(--tinta);border:1px solid #2a3547;border-radius:8px;padding:7px 8px;font-size:13px"></div>
+    <p style="color:var(--meia);font-size:12px">Ou, sem destino escrito, escolhe uma rota de teste já pronta:</p>
+    <div class="linha" id="linhaRota"><span>Rota de teste</span><select id="selRota">
+      <option value="a1">A1 Lisboa→Porto (carro)</option>
+      <option value="alentejo">Alentejo (carro)</option>
+      <option value="douro">Douro (carro)</option>
+      <option value="baixa-lisboa">Baixa de Lisboa (a pé)</option>
+    </select></div>
+    <div class="linha" id="linhaTurbo"><span>Acelerar tempo</span><select id="selTurbo">
+      <option value="20">20×</option><option value="60" selected>60×</option><option value="200">200×</option>
+    </select></div>
+  </div>
   <p id="avisoRec"></p>
   <button id="ligar">Ligar companheiro</button>
 </div>
@@ -279,7 +288,7 @@ const S = {
   ativos:{HISTORIA:true, SABORES:true, ECONOMIA:true, DEMOGRAFIA:true, ACTUALIDADE:true},
   detalhe:{HISTORIA:2, SABORES:2, ECONOMIA:2, DEMOGRAFIA:2, ACTUALIDADE:2},
   demo:{populacao:true, densidade:true, area:true, altitude:true},
-  extra:{avisos:true, gente:true, rua:true},
+  extra:{avisos:true, gente:true, rua:true, leitura:true},
   lingua:"pt-PT",
   veloc:0, rumo:null, ultimaPos:null, dAcum:0, ultimoAnuncioD:-1e12,
   ultimoConcelho:null, ultimaRua:null, ditos:new Set(), ultimoTexto:"",
@@ -288,6 +297,7 @@ const S = {
   podcasts:[], audioFundo:null,      // {tipo:"radio"|"podcast", nome, indice}
   semNovidadesSeguidas:0,
   interesses:{},                     // {azulejos:true, ...} — ver INTERESSES
+  fonte:"gps",                       // "gps" ou "sim" — pré-viagem nunca escreve em M (Fase 6)
 };
 const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
                DEMOGRAFIA:"números", ACTUALIDADE:"notícias"};
@@ -342,6 +352,8 @@ let M={ditos:{}, visitas:{}, entidades:{}, pesos:{}, podcast:null,
         // colecoes: {pelourinhos:{vistos:{qid:timestamp}}, ...}; stats: distanciaPorModo em metros
 try{ Object.assign(M, JSON.parse(localStorage.getItem("cv-mem")||"{}")); }catch(e){}
 S.ditos=new Set(Object.keys(M.ditos));
+const _ditosReal=S.ditos;   // referência ao Set real — a pré-viagem (Fase 6) troca S.ditos
+                            // por um Set descartável e restaura este ao acabar/ao ligar GPS
 
 let _tMem=null;
 function guardaMemoria(){
@@ -358,24 +370,32 @@ function guardaMemoria(){
     try{ localStorage.setItem("cv-mem",JSON.stringify(M)); }catch(e){}
   },800);
 }
-function marcaDito(chave){ S.ditos.add(chave); M.ditos[chave]=Date.now(); guardaMemoria(); }
+// REGRA MAIS IMPORTANTE DA FASE 6: a pré-viagem (S.fonte==="sim") é uma
+// antevisão, não uma visita real — nada do que é dito ou aprendido nela pode
+// persistir em M, senão a viagem real a sério fica muda ou com um passaporte
+// mentiroso. Por isso todas as funções que escrevem em M ficam mudas em sim.
+function marcaDito(chave){
+  S.ditos.add(chave);
+  if(S.fonte==="sim") return;
+  M.ditos[chave]=Date.now(); guardaMemoria();
+}
 function registaEntidade(nome,onde){
-  if(!nome||nome.length<5||!onde) return;
+  if(S.fonte==="sim"||!nome||nome.length<5||!onde) return;
   if(!M.entidades[nome]) M.entidades[nome]={onde, quando:Date.now()};
   guardaMemoria();
 }
 function reforca(canal,fator){
-  if(!canal||!NOMES[canal]) return;
+  if(S.fonte==="sim"||!canal||!NOMES[canal]) return;
   M.pesos[canal]=Math.min(2.5,Math.max(0.3,(M.pesos[canal]||1)*fator));
   guardaMemoria();
 }
 // devolve {texto, primeiraVez} — primeiraVez distingue "nunca visitado antes" de
 // "visitado recentemente" (mesma condição !ultima), usado pelo passaporte (4.2) e
-// pelo briefing de chegada (4.5)
+// pelo briefing de chegada (4.5). Em pré-viagem só lê M.visitas, nunca escreve.
 function saudacaoRegresso(concelho){
   const v=M.visitas[concelho]||[], ultima=v[v.length-1], agora=Date.now();
   const primeiraVez=!ultima;
-  if(!ultima||agora-ultima>20*3600e3){ v.push(agora); M.visitas[concelho]=v.slice(-10); guardaMemoria(); }
+  if(S.fonte!=="sim"&&(!ultima||agora-ultima>20*3600e3)){ v.push(agora); M.visitas[concelho]=v.slice(-10); guardaMemoria(); }
   if(ultima&&agora-ultima>20*3600e3){
     const d=new Date(ultima), anoDif=d.getFullYear()!==new Date().getFullYear();
     return {texto:`Já por aqui tinhas passado em ${MESES[d.getMonth()]}${anoDif?" de "+d.getFullYear():""} — desta vez conto-te coisas novas. `, primeiraVez};
@@ -383,7 +403,7 @@ function saudacaoRegresso(concelho){
   return {texto:"", primeiraVez};
 }
 function registaFreguesia(concelho,freguesia){
-  if(!concelho||!freguesia) return;
+  if(S.fonte==="sim"||!concelho||!freguesia) return;
   const chave=`${concelho}/${freguesia}`;
   if(!M.freguesias[chave]){ M.freguesias[chave]=Date.now(); guardaMemoria(); }
 }
@@ -396,7 +416,7 @@ function concelhosNovosEsteMes(){
   }).length;
 }
 function acrescentaDistancia(modo,metros){
-  if(!(metros>0)) return;
+  if(S.fonte==="sim"||!(metros>0)) return;
   M.stats.distanciaPorModo[modo]=(M.stats.distanciaPorModo[modo]||0)+metros;
   guardaMemoria();
 }
@@ -425,7 +445,7 @@ function respostaColecoes(){
 // verifica se o QID de um item de história pertence a uma das COLECOES (P31 no Wikidata);
 // devolve a frase a acrescentar ao anúncio, "" se já visto, ou null se não pertence/erro
 async function verificaColecao(qid){
-  if(!qid) return null;
+  if(S.fonte==="sim"||!qid) return null;
   try{
     const ent=(await wikidata([qid]))[qid];
     const tipos=(((ent||{}).claims||{}).P31||[]).map(c=>(((c.mainsnak||{}).datavalue||{}).value||{}).id);
@@ -505,6 +525,12 @@ async function nominatim(lat,lon){
   const linha=[freg,conc].filter(Boolean).join(" · ")||(d&&d.display_name)||"—";
   return {freguesia:freg, concelho:conc, distrito:a.district||a.state, linha};
 }
+// geocodificação por texto (Fase 6, pré-viagem): "Évora" → coordenadas do centro
+async function geocodifica(nomeLugar){
+  const d=await busca(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nomeLugar)}&countrycodes=pt&format=jsonv2&limit=1&addressdetails=0`);
+  const r=(d||[])[0];
+  return r?{lat:+r.lat, lon:+r.lon, nome:r.display_name}:null;
+}
 async function wikiGeo(lat,lon,lang,raio){
   const d=await busca(WIKI(lang)+`list=geosearch&gscoord=${lat}%7C${lon}&gsradius=${Math.min(raio,10000)}&gslimit=30`);
   return (d&&d.query&&d.query.geosearch)||[];
@@ -545,6 +571,58 @@ const CML_PATRIMONIO="https://services.arcgis.com/1dSrzEWVQn5kHHyK/arcgis/rest/s
 const CML_CASAS_RELIGIOSAS="https://services.arcgis.com/1dSrzEWVQn5kHHyK/arcgis/rest/services/Cultura_CasasReligiosas/FeatureServer/0";
 
 function ehLisboa(local){ return norm((local&&local.concelho)||"")==="lisboa"; }
+
+/* Porto (Fase 5, secção 6.3) — dados abertos REAIS da câmara em
+   opendata.porto.digital (portal CKAN, não ArcGIS Hub — Coimbra/Braga/
+   Guimarães/Évora/Faro não têm nenhum catálogo aberto real com património
+   ou toponímia, confirmado por pesquisa; ver README). O CSV vem num dialecto
+   CSV com aspas simples e os campos de texto em formato de dicionário Python
+   (`[{'lang': 'pt-PT', 'value': '...'}, ...]`), daí o parser dedicado. */
+function ehPorto(local){ return norm((local&&local.concelho)||"")==="porto"; }
+const PORTO_MONUMENTOS_CSV="https://opendata.porto.digital/dataset/ea52029a-5d95-42ef-8a7e-518b86d74e9f/resource/389a446c-8eaf-4406-b9ca-f1637c440de4/download/pontos-de-interesse-cultura-e-patrimonio-monumentos.csv";
+function _parseCSVAspas(texto,aspas){
+  const linhas=[]; let campo="", linha=[], dentro=false;
+  for(let i=0;i<texto.length;i++){
+    const c=texto[i];
+    if(dentro){
+      if(c===aspas){ if(texto[i+1]===aspas){ campo+=aspas; i++; } else dentro=false; }
+      else campo+=c;
+    }else{
+      if(c===aspas) dentro=true;
+      else if(c===","){ linha.push(campo); campo=""; }
+      else if(c==="\n"||c==="\r"){
+        if(c==="\r"&&texto[i+1]==="\n") i++;
+        if(linha.length||campo){ linha.push(campo); linhas.push(linha); }
+        linha=[]; campo="";
+      }else campo+=c;
+    }
+  }
+  if(campo||linha.length){ linha.push(campo); linhas.push(linha); }
+  return linhas;
+}
+function _valorPT(campo){
+  const m=/'lang':\s*'pt-PT'.*?'value':\s*(['"])([\s\S]*?)\1\s*\}/.exec(campo||"");
+  return m?m[2]:null;
+}
+async function patrimonioPorto(lat,lon,raioM){
+  const texto=await textoViaProxy(PORTO_MONUMENTOS_CSV);
+  if(!texto) return [];
+  const marca="Markdown Content:\n";
+  const i=texto.indexOf(marca);
+  const linhas=_parseCSVAspas(i>=0?texto.slice(i+marca.length):texto,"'");
+  if(!linhas.length) return [];
+  const cab=linhas[0];
+  const fora=[];
+  for(const l of linhas.slice(1)){
+    const obj={}; cab.forEach((h,idx)=>obj[h]=l[idx]);
+    const plat=parseFloat(obj.latitude), plon=parseFloat(obj.longitude);
+    if(isNaN(plat)||isNaN(plon)||distM(lat,lon,plat,plon)>raioM) continue;
+    const nome=_valorPT(obj.label), desc=_valorPT(obj.description);
+    if(!nome||!desc) continue;
+    fora.push({chave:nome, texto:`${nome}. ${frases(desc,3)}`});
+  }
+  return fora;
+}
 
 async function arcgisPerto(url,lat,lon,raioM,outFields){
   const q=`${url}/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326`+
@@ -631,6 +709,79 @@ async function overpass(lat,lon,raio=400){
   const q=`[out:json][timeout:20];(node(around:${raio},${lat},${lon})["historic"];node(around:${raio},${lat},${lon})["tourism"~"^(attraction|museum|artwork|viewpoint|gallery)$"];);out tags 30;`;
   const d=await busca(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
   return (d&&d.elements)||[];
+}
+/* Literatura geolocalizada (Fase 5, secção 6.1) — excertos REAIS de obras em
+   domínio público na Wikisource PT que mencionam o lugar. A pesquisa de
+   texto integral apanha muito lixo (leis municipais, hinos, índices de
+   capítulos, catálogos tabulares, e nomes de pessoa que por acaso coincidem
+   com topónimos — "Faro"/"Braga"/"Porto"/"Guimarães" são também apelidos
+   portugueses comuns): os filtros abaixo foram afinados testando ao vivo
+   contra 11 termos reais (ver README) e nem sempre encontram uma correspondência
+   boa — falha em silêncio (devolve null) em vez de arriscar um excerto errado. */
+const RE_WS_EXCLUI=/^(Lei |Hino |Decreto|Resolução|Portaria|Anexo:|Predefinição:|Página:|Categoria:)/i;
+const RE_WS_AUTOR_FRACO=/^(vários|anónimo|anonimo|desconhecido|autores? diversos)$/i;
+const RE_WS_PREP_LOCAL=/\b(em|de|do|da|dos|das|no|na|nos|nas|a|à|ao|aos|às|para|junto)\s+$/i;
+function _wsPareceIndice(t){
+  const marcas=(t.match(/\b\d{1,3}\.\s+[A-ZÀ-Ú]/g)||[]).length;
+  const parenteses=(t.match(/\([A-ZÀ-Ú][^)]{2,25}\)/g)||[]).length;
+  const digitos=(t.match(/\d/g)||[]).length/t.length;
+  const capitulo=(t.match(/[Cc]ap[íi]tulo [IVXLC0-9]+[:.]?/g)||[]).length;
+  return marcas>=2||parenteses>=3||digitos>0.04||capitulo>=1;
+}
+async function _wsExcertoDaPagina(pageid,nome){
+  const dp=await busca(`https://pt.wikisource.org/w/api.php?origin=*&format=json&formatversion=2&action=parse&pageid=${pageid}&prop=text`);
+  const htmlRaw=(dp&&dp.parse&&dp.parse.text)||"";
+  const autorMatch=/<a href="\/wiki\/Autor:[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)/.exec(htmlRaw);
+  if(!autorMatch) return null;
+  const autor=autorMatch[1].trim();
+  if(RE_WS_AUTOR_FRACO.test(autor)) return null;
+  const doc=new DOMParser().parseFromString(htmlRaw,"text/html");
+  doc.querySelectorAll("#navigationHeader,#navigationNotes,.ws-noexport,.noprint,sup,.reference").forEach(e=>e.remove());
+  const texto=doc.body.textContent.replace(/\s+/g," ").trim();
+  let pos=-1;
+  while((pos=texto.indexOf(nome,pos+1))!==-1){
+    const antes=texto.slice(Math.max(0,pos-25),pos);
+    const palavraAntes=/(\S+)\s*$/.exec(antes.trim());
+    // rejeita se parece parte de um nome de pessoa (palavra anterior capitalizada
+    // e não é uma preposição de lugar) — "Delfim Guimarães", "Pereira de Faro"
+    if(palavraAntes&&/^[A-ZÀ-Ú]/.test(palavraAntes[1])&&!RE_WS_PREP_LOCAL.test(antes)) continue;
+    let ini=texto.lastIndexOf(".",pos)+1; if(ini<0) ini=0;
+    let fim=texto.indexOf(".",pos+nome.length); if(fim<0) fim=texto.length;
+    let excerto=texto.slice(ini,fim+1).trim(), tent=0;
+    while(excerto.length<200&&tent<3){ fim=texto.indexOf(".",fim+1); if(fim<0) break; excerto=texto.slice(ini,fim+1).trim(); tent++; }
+    if(excerto.length>600) excerto=excerto.slice(0,600);
+    if(excerto.length<150||_wsPareceIndice(excerto)) continue;
+    return {autor, excerto};
+  }
+  return null;
+}
+async function buscaWikisource(nome){
+  const ds=await busca(`https://pt.wikisource.org/w/api.php?origin=*&format=json&formatversion=2&action=query&list=search&srsearch=${encodeURIComponent('"'+nome+'"')}&srlimit=10&srnamespace=0`);
+  const cands=(ds&&ds.query&&ds.query.search)||[];
+  for(const c of cands){
+    if(RE_WS_EXCLUI.test(c.title)) continue;
+    try{
+      const r=await _wsExcertoDaPagina(c.pageid,nome);
+      if(r) return {titulo:c.title.split("/")[0], autor:r.autor, excerto:r.excerto};
+    }catch(e){ console.warn("wikisource página:",e); }
+  }
+  return null;
+}
+// tenta cada nome de lugar candidato (freguesia → concelho → distrito), uma
+// única vez por sessão para cada (marcado em S.ditos, mesmo mecanismo do
+// resto da app) — evita repetir a mesma pesquisa cara a cada anúncio
+async function wikisourceExcerto(nomes){
+  for(const nome of nomes){
+    if(!nome) continue;
+    const chaveTentativa=`ws-tentativa:${nome}`;
+    if(S.ditos.has(chaveTentativa)) continue;
+    marcaDito(chaveTentativa);
+    try{
+      const achado=await buscaWikisource(nome);
+      if(achado) return achado;
+    }catch(e){ console.warn("wikisource:",e); }
+  }
+  return null;
 }
 /* IPMA: avisos meteorológicos por distrito (API aberta, sem chave) */
 async function avisosIPMA(distrito){
@@ -975,6 +1126,13 @@ async function canalHistoria(f){
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património CML:",e); }
   }
+  if(ehPorto(f.local)&&f.lat!=null){
+    try{
+      const raio=(MODOS[f.modo]||MODOS.pe).raio;
+      for(const it of await patrimonioPorto(f.lat,f.lon,raio))
+        if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
+    }catch(e){ console.warn("património Porto:",e); }
+  }
   // a pé (ou a correr — é gente a pé, só mais depressa), se a frente veio
   // pobre em novidades, olha em volta — sem repetir o que já foi escolhido
   if(ehAPe(f.modo)&&f.rumo!=null){
@@ -997,6 +1155,17 @@ async function canalHistoria(f){
         gente.forEach(p=>registaEntidade(p.nome, f.local.concelho));
       }
     }
+  }
+  if(S.extra.leitura){
+    try{
+      const nomes=[...new Set([f.local.freguesia,f.local.concelho,f.local.distrito].filter(Boolean))];
+      const lit=await wikisourceExcerto(nomes);
+      if(lit){
+        const chave=`leitura:${lit.titulo}`;
+        if(!fora.some(x=>x.chave===chave))
+          fora.push({chave, texto:`Escreveu ${lit.autor}, em ${lit.titulo}: «${lit.excerto}»`});
+      }
+    }catch(e){ console.warn("literatura:",e); }
   }
   return fora;
 }
@@ -1983,7 +2152,9 @@ async function anunciar(lat,lon){
                           :`Estás perto de ${local.linha}. `;
       const saudacao=saudacaoRegresso(local.concelho);      // "já por aqui passaste em…"
       pre+=saudacao.texto;
-      if(saudacao.primeiraVez){
+      // o passaporte e o briefing de chegada são conquistas de uma visita REAL —
+      // numa pré-viagem (Fase 6) seria um "É o teu Nº concelho" mentiroso
+      if(saudacao.primeiraVez&&S.fonte!=="sim"){
         ehBriefing=true;
         const totalConcelhos=Object.keys(M.visitas).length;
         pre+=`É o teu ${totalConcelhos}.º concelho — ainda te faltam ${Math.max(0,308-totalConcelhos)}. `;
@@ -2099,21 +2270,33 @@ const ROTAS={
   "baixa-lisboa":{v:1.4,p:[[38.7075,-9.1364],[38.7104,-9.1385],[38.7139,-9.1394],[38.7098,-9.1330],[38.7139,-9.1335]]},
 };
 function iniciaGPS(){
+  S.fonte="gps"; S.ditos=_ditosReal;   // por garantia, caso uma pré-viagem tenha ficado a meio
   if(!navigator.geolocation){regista("cmd","Este browser não tem geolocalização."); return;}
   navigator.geolocation.watchPosition(
     p=>novaPosicao(p.coords.latitude,p.coords.longitude,p.timestamp,p.coords.speed),
     e=>regista("cmd",`GPS indisponível: ${e.message}. Podes usar a simulação.`),
     {enableHighAccuracy:true, maximumAge:2000, timeout:15000});
 }
-function iniciaSim(nomeRota,turbo){
-  const r=ROTAS[nomeRota];
+// motor partilhado por toda a simulação (rotas de teste e pré-viagem real):
+// avança ao longo de r.p (lista [lat,lon]) à velocidade r.v, relógio acelerado
+// por turbo×; aoTerminar corre quando chega ao fim do percurso
+function _correRota(r,turbo,aoTerminar){
   const acum=[0];
   for(let i=1;i<r.p.length;i++) acum.push(acum[i-1]+distM(...r.p[i-1],...r.p[i]));
   const total=acum[acum.length-1];
   let d=0, tSim=Date.now();
   const passoReal=600;
   const timer=setInterval(()=>{
-    if(d>=total){clearInterval(timer); regista("cmd","Fim do percurso simulado."); return;}
+    if(d>=total){
+      clearInterval(timer);
+      // só restaura fonte/ditos depois do ÚLTIMO anunciar() em curso terminar —
+      // senão uma chamada assíncrona ainda a decorrer (ex: pesquisa à Wikisource)
+      // podia escrever em M depois da pré-viagem já se ter dado por terminada
+      const esperaFalar=setInterval(()=>{
+        if(!S.anunciando){ clearInterval(esperaFalar); aoTerminar(); }
+      },300);
+      return;
+    }
     let i=acum.findIndex(a=>a>d); if(i<1) i=acum.length-1;
     const f=(d-acum[i-1])/((acum[i]-acum[i-1])||1);
     const lat=r.p[i-1][0]+(r.p[i][0]-r.p[i-1][0])*f;
@@ -2122,6 +2305,53 @@ function iniciaSim(nomeRota,turbo){
     novaPosicao(lat,lon,tSim,r.v);
     d+=r.v*(passoReal/1000)*turbo;
   },passoReal);
+}
+function iniciaSim(nomeRota,turbo){
+  S.fonte="sim"; S.ditos=new Set();     // antevisão: nunca escreve em M (ver marcaDito)
+  _correRota(ROTAS[nomeRota], turbo, ()=>{
+    regista("cmd","Fim do percurso simulado.");
+    S.fonte="gps"; S.ditos=_ditosReal;
+  });
+}
+function geraRotaRecta(origem,destino,npontos){
+  npontos=npontos||8;
+  const p=[];
+  for(let i=0;i<=npontos;i++){
+    const f=i/npontos;
+    p.push([origem.lat+(destino.lat-origem.lat)*f, origem.lon+(destino.lon-origem.lon)*f]);
+  }
+  return p;
+}
+// Fase 6: pré-viagem por destino escrito. Geocodifica origem (ou usa o GPS
+// actual) e destino, gera um percurso RECTO por interpolação — sem API de
+// rotas — e corre-o como qualquer simulação. Regra de ouro: S.fonte="sim"
+// durante todo o percurso, para nada persistir em M (ver marcaDito e afins).
+async function iniciaPreViagem(textoOrigem,textoDestino,turbo){
+  regista("cmd",`A localizar ${textoDestino}...`);
+  const destino=await geocodifica(textoDestino);
+  if(!destino){ regista("cmd",`Não encontrei "${textoDestino}" em Portugal.`); return; }
+  let origem=null;
+  if(textoOrigem&&textoOrigem.trim()) origem=await geocodifica(textoOrigem);
+  if(!origem){
+    origem=await new Promise(res=>{
+      if(!navigator.geolocation){ res(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        p=>res({lat:p.coords.latitude, lon:p.coords.longitude}),
+        ()=>res(null), {timeout:8000});
+    });
+  }
+  if(!origem){ regista("cmd","Preciso de um ponto de partida — escreve-o ou permite o GPS."); return; }
+  const distTotal=distM(origem.lat,origem.lon,destino.lat,destino.lon);
+  const v=distTotal>15000?25:1.4;               // percurso longo → ritmo de carro; curto → a pé
+  const rota={v, p:geraRotaRecta(origem,destino,8)};
+  S.fonte="sim"; S.ditos=new Set();
+  regista("cmd",`Pré-viagem até ${textoDestino}: percurso aproximado em linha recta, `+
+                `${(distTotal/1000).toFixed(1)} km.`);
+  _correRota(rota, turbo, ()=>{
+    const t="Boa viagem a sério. Quando fores, eu vou contigo.";
+    regista("cmd",t); dizJa(t);
+    S.fonte="gps"; S.ditos=_ditosReal;
+  });
 }
 
 /* ═══════════════════ interface ═══════════════════ */
@@ -2231,8 +2461,7 @@ document.querySelectorAll("[data-extra]").forEach(x=>
   x.onchange=()=>{S.extra[x.dataset.extra]=x.checked; guardaPrefs();});
 $("#selLingua").onchange=e=>{S.lingua=e.target.value; escolheVoz(); if(rec) rec.lang=S.lingua; guardaPrefs();};
 $("#selFonte").onchange=e=>{
-  const sim=e.target.value==="sim";
-  $("#linhaRota").hidden=!sim; $("#linhaTurbo").hidden=!sim;
+  $("#blocoPreViagem").hidden=e.target.value!=="sim";
 };
 
 /* ═══════════════════ manter o ecrã ligado, a sério ═══════════════════
@@ -2288,9 +2517,11 @@ $("#ligar").onclick=async()=>{
   dizJa("Companheiro ligado.");
   S.micAtivo=iniciaOuvido(); pintaMic();
   if(!recDisponivel) regista("cmd","Menu falado indisponível neste browser — usa os botões.");
-  if($("#selFonte").value==="sim")
-    iniciaSim($("#selRota").value, +$("#selTurbo").value);
-  else iniciaGPS();
+  if($("#selFonte").value==="sim"){
+    const destino=$("#txtDestino").value.trim();
+    if(destino) iniciaPreViagem($("#txtPartida").value.trim(), destino, +$("#selTurbo").value);
+    else iniciaSim($("#selRota").value, +$("#selTurbo").value);
+  }else iniciaGPS();
 };
 const RecTest=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(!RecTest) $("#avisoRec").textContent="Nota: o menu falado precisa de Chrome no Android; noutros browsers usa os botões.";
