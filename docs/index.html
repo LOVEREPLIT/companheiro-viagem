@@ -141,6 +141,7 @@
     <div class="linha"><span>Filhos da terra (figuras ilustres)</span><input type="checkbox" data-extra="gente" checked></div>
     <div class="linha"><span>Rua e bairro (a pé)</span><input type="checkbox" data-extra="rua" checked></div>
     <div class="linha"><span>Literatura (Wikisource, excertos reais)</span><input type="checkbox" data-extra="leitura" checked></div>
+    <div class="linha"><span>Património classificado (SIPA/DGPC)</span><input type="checkbox" data-extra="sipa" checked></div>
   </div>
 
   <h3>Os meus interesses</h3>
@@ -288,7 +289,7 @@ const S = {
   ativos:{HISTORIA:true, SABORES:true, ECONOMIA:true, DEMOGRAFIA:true, ACTUALIDADE:true},
   detalhe:{HISTORIA:2, SABORES:2, ECONOMIA:2, DEMOGRAFIA:2, ACTUALIDADE:2},
   demo:{populacao:true, densidade:true, area:true, altitude:true},
-  extra:{avisos:true, gente:true, rua:true, leitura:true},
+  extra:{avisos:true, gente:true, rua:true, leitura:true, sipa:true},
   lingua:"pt-PT",
   veloc:0, rumo:null, ultimaPos:null, dAcum:0, ultimoAnuncioD:-1e12,
   ultimoConcelho:null, ultimaRua:null, ditos:new Set(), ultimoTexto:"",
@@ -783,6 +784,82 @@ async function wikisourceExcerto(nomes){
   }
   return null;
 }
+
+/* SIPA — inventário arquitectónico da DGPC (Fase 5, secção 6.2, retomada).
+   Não tem API, só um formulário HTML (POST pesquisa.php→resultado.php,
+   por concelho). Descoberto ao vivo inspeccionando o HTML real do
+   formulário — a lista de concelhos e os respectivos IDs numéricos não
+   estão documentados em lado nenhum, só existem dentro do próprio <select>.
+   O proxy usado aqui é sempre o corsproxy.io directo (não o textoViaProxy/
+   r.jina.ai, que só devolve a versão em Markdown do formulário — sem os
+   IDs dos <option> — e não sabe fazer POST). As fichas individuais
+   (detalhes.php) continuam a ler-se bem via textoViaProxy. */
+let _sipaConcelhos=null;
+async function _sipaFetch(url,metodo,corpo){
+  const chave=`sipa:${metodo}:${url}:${corpo||""}`;
+  if(cache.has(chave)) return cache.get(chave);
+  let t=null;
+  try{
+    const r=await fetch("https://corsproxy.io/?url="+encodeURIComponent(url),
+      metodo==="POST"?{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:corpo}:{});
+    t=r.ok?await r.text():null;
+  }catch(e){ console.warn("SIPA fetch:",e); }
+  cache.set(chave,t);
+  return t;
+}
+async function _carregaConcelhosSIPA(){
+  if(_sipaConcelhos) return _sipaConcelhos;
+  _sipaConcelhos={};
+  const html=await _sipaFetch("https://imovel.patrimoniocultural.gov.pt/pesquisa.php","GET");
+  if(!html) return _sipaConcelhos;
+  const iSel=html.indexOf('name="concelho"');
+  const iFim=html.indexOf("</select>",iSel);
+  if(iSel<0||iFim<0) return _sipaConcelhos;
+  for(const m of html.slice(iSel,iFim).matchAll(/<option value="(\d+)">([^<]+)<\/option>/g)){
+    const chave=norm(m[2].trim());
+    if(!_sipaConcelhos[chave]) _sipaConcelhos[chave]=m[1];   // 1.ª ocorrência = entrada "pura", não combinada
+  }
+  return _sipaConcelhos;
+}
+function _sipaExtraiFicha(md){
+  const mTit=/## DETALHES\s*\n+([^\n]+)/.exec(md||"");
+  const titulo=mTit?mTit[1].trim():null;
+  if(!titulo) return null;
+  const iNota=md.indexOf("Nota Histórico-Artistica");
+  if(iNota<0) return null;
+  let corpo=md.slice(iNota+"Nota Histórico-Artistica".length,iNota+2200)
+              .replace(/\*\*/g,"").replace(/_/g,"").replace(/\s+/g," ").trim();
+  const nota=frases(corpo,3);
+  if(nota.length<80) return null;
+  return {titulo, nota};
+}
+async function buscaSIPA(nomeConcelho){
+  const mapa=await _carregaConcelhosSIPA();
+  const id=mapa[norm(nomeConcelho)];
+  if(!id) return null;
+  const corpo=new URLSearchParams({code:"",situcaoatual:"",protecao:"",itinerario:"",tipologia:"",concelho:id}).toString();
+  const html=await _sipaFetch("https://imovel.patrimoniocultural.gov.pt/resultado.php","POST",corpo);
+  if(!html) return null;
+  const codigos=[...new Set([...html.matchAll(/detalhes\.php\?code=(\d+)/g)].map(m=>m[1]))];
+  for(const code of codigos.slice(0,3)){
+    try{
+      const md=await textoViaProxy(`https://imovel.patrimoniocultural.gov.pt/detalhes.php?code=${code}`);
+      const ficha=md&&_sipaExtraiFicha(md);
+      if(ficha) return ficha;
+    }catch(e){ console.warn("SIPA ficha:",e); }
+  }
+  return null;
+}
+// uma única tentativa por concelho por sessão — mesmo mecanismo do wikisourceExcerto
+async function sipaExcerto(concelho){
+  if(!concelho) return null;
+  const chaveTentativa=`sipa-tentativa:${concelho}`;
+  if(S.ditos.has(chaveTentativa)) return null;
+  marcaDito(chaveTentativa);
+  try{ return await buscaSIPA(concelho); }
+  catch(e){ console.warn("SIPA:",e); return null; }
+}
+
 /* IPMA: avisos meteorológicos por distrito (API aberta, sem chave) */
 async function avisosIPMA(distrito){
   if(!distrito) return [];
@@ -1166,6 +1243,16 @@ async function canalHistoria(f){
           fora.push({chave, texto:`Escreveu ${lit.autor}, em ${lit.titulo}: «${lit.excerto}»`});
       }
     }catch(e){ console.warn("literatura:",e); }
+  }
+  if(S.extra.sipa&&f.local.concelho){
+    try{
+      const ficha=await sipaExcerto(f.local.concelho);
+      if(ficha){
+        const chave=`sipa:${ficha.titulo}`;
+        if(!fora.some(x=>x.chave===chave))
+          fora.push({chave, texto:`${ficha.titulo}, património classificado. ${ficha.nota}`});
+      }
+    }catch(e){ console.warn("SIPA:",e); }
   }
   return fora;
 }

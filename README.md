@@ -76,23 +76,32 @@ Nunca inventa — nada encontrado de jeito devolve `null` e o canal
 simplesmente segue sem literatura nesse anúncio. Uma pesquisa por nome de
 lugar só é tentada UMA vez por sessão (mesmo mecanismo do `S.ditos`).
 
-### 6.2 SIPA / MatrizPCI (tentado, descartado)
-Ambos existem a sério, em domínios diferentes dos que o plano supunha
-(`imovel.patrimoniocultural.gov.pt`, não `sipa.dgpc.pt`; e
-`matrizpci.patrimoniocultural.gov.pt`, não `matrizpci.dgpc.pt`). Confirmei
-ao vivo, via a cadeia de proxy já existente (`r.jina.ai`), que uma ficha
-do SIPA se lê bem e tem texto histórico real e detalhado — testei 4 fichas
-reais (Castelo de Palmela, Igreja dos Clérigos, Igreja de Santa Maria de
-Tavira, Casa Havaneza) e a extracção de título+nota histórica foi limpa
-nas 4. O que **não existe**: nenhuma forma de pesquisar por localização —
-só um formulário HTML, sem API. Tentei uma alternativa: o Wikidata tem
-mesmo uma propriedade "SIPA ID" (P1700, confirmei no Castelo de Palmela,
-valor "4075") — mas esse ID pertence ao esquema ANTIGO do site
-`monumentos.gov.pt`, que confirmei estar mesmo fora do ar (todas as 3 vias
-de proxy falharam). Sem forma de ir de "onde estou" para "que ficha
-mostrar", não há como integrar isto para qualquer ponto do país — só para
-uma lista de sítios já conhecidos à partida, o que não é o espírito da
-app. Documentado e descartado, como o plano permite explicitamente.
+### 6.2 SIPA (integrado, retomado depois de descartado) / MatrizPCI (descartado)
+Numa primeira ronda descartei o SIPA por não ter API de pesquisa por
+localização — só um formulário HTML. Depois de o utilizador pedir para
+retomar, inspeccionei o HTML real do formulário (`pesquisa.php`, via
+corsproxy.io directo — a versão em Markdown do `textoViaProxy` não mostra
+os `<option>` do `<select>`) e descobri que **é submetível por concelho**:
+`POST resultado.php` com um `concelho=<id numérico>`, onde o `id` de cada
+concelho só existe dentro das opções desse `<select>` — não há tabela
+nenhuma disto documentada, teve de ser extraída ao vivo. Testado de ponta
+a ponta com concelhos reais:
+- Palmela → id 2813 → 15 fichas reais, incluindo "Grutas da Quinta do
+  Anjo" (sítio arqueológico, Neolítico Final/Calcolítico).
+- Tavira → "Capela ou Ermida de São Sebastião, com todo o seu recheio",
+  com nota histórico-artística real.
+A extracção de título+nota (a mesma usada nas 4 fichas já validadas
+antes) mantém-se fiável. Cada concelho só é pesquisado UMA vez por sessão
+(mesmo mecanismo do `S.ditos` que a Wikisource usa) — o formulário custa
+uma pesquisa + até 3 fichas por concelho, por isso não vale a pena
+repetir. Domínio real: `imovel.patrimoniocultural.gov.pt` (não
+`sipa.dgpc.pt`, como o plano supunha).
+
+**MatrizPCI continua descartado.** Existe a sério
+(`matrizpci.patrimoniocultural.gov.pt`, não `matrizpci.dgpc.pt`), mas não
+voltei a investigar se tem o mesmo tipo de formulário submetível por
+concelho — fica como próximo passo se algum dia valer a pena (patrimonio
+imaterial: lendas, festas, artes populares).
 
 ### 6.3 Mais câmaras com dados abertos
 - **Porto — integrado.** `opendata.porto.digital` (portal CKAN, não
