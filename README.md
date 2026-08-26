@@ -6,6 +6,32 @@ Três programas, três perguntas:
 2. **`companheiro.py`** — funciona como companheiro contínuo, sem destino, com voz? (Sim.)
 3. **`webapp/`** — corre num smartphone, sem loja de apps? (Sim — ver abaixo.)
 
+## Fase 1 do PLANO-EXECUCAO.md — concluída (agosto 2026)
+
+Gancho curto + «conta mais»/«conta menos» + duração adaptativa ao modo +
+pré-carregamento em segundo plano. Detalhe completo no commit; resumo:
+
+- Cada anúncio fala só o gancho (1-2 frases, conforme o modo); o resto
+  fica disponível a pedido — «conta mais» (ou botão ⏵ novo na barra de
+  ícones) fala-o e reforça o interesse nesse canal; «conta menos» encurta
+  e desce o detalhe, sem contar como salto (não dispara a auto-troca de
+  canal que o «salta» dispara).
+- A pé fala-se mais (750 caracteres, 2 frases); de carro, menos (450, 1
+  frase) — `limitesFala()`, consultado por `paraVoz()` e por `narrar()`.
+- Testado: **14/14 da bateria de regressão** (`PLANO-TESTES.md`, secção
+  R) e **7/7 dos critérios de aceitação da Fase 1** (T-F1).
+- **Limitação pré-existente descoberta a testar** (não introduzida agora):
+  a tabela `COMANDOS` dá prioridade aos gatilhos de troca de canal
+  (`/historia/`, `/economia/`, …) sobre qualquer comando mais recente na
+  lista — uma frase como "conta mais sobre esta história" é apanhada por
+  engano pelo comando que muda para o canal HISTÓRIA, porque "história"
+  bate certo com esse padrão e esse comando está mais acima na tabela.
+  «desenvolve» e «continua essa» (sem mais nada a seguir) funcionam bem.
+  Fica para uma fase futura arrumar a prioridade da tabela de comandos.
+- Confirmado também: o ambiente de teste (Browser pane em 2.º plano) pode
+  atrasar uma única chamada de rede em dezenas de segundos — não é bug
+  da app, é o browser a poupar recursos com o separador sem foco.
+
 ## webapp — a app para o telemóvel (sem loja de apps)
 
 Um único ficheiro HTML que corre no Chrome do telemóvel. Para a usares:
