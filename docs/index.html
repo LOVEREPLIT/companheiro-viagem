@@ -258,6 +258,7 @@ const S = {
   veloc:0, rumo:null, ultimaPos:null, dAcum:0, ultimoAnuncioD:-1e12,
   ultimoConcelho:null, ultimaRua:null, ditos:new Set(), ultimoTexto:"",
   saltos:{}, ultimoAnuncio:null,     // {canal,gancho,resto} — para "conta mais"
+  modo:"pe", _modoPendente:null, _modoPendenteDesde:0,   // histerese de modo
 };
 const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
                DEMOGRAFIA:"números", ACTUALIDADE:"notícias"};
@@ -471,8 +472,8 @@ async function wikidata(qids){
   const d=await busca(`https://www.wikidata.org/w/api.php?origin=*&action=wbgetentities&format=json&ids=${qids.join("%7C")}&props=claims`);
   return (d&&d.entities)||{};
 }
-async function overpass(lat,lon){
-  const q=`[out:json][timeout:20];(node(around:400,${lat},${lon})["historic"];node(around:400,${lat},${lon})["tourism"~"^(attraction|museum|artwork|viewpoint|gallery)$"];);out tags 30;`;
+async function overpass(lat,lon,raio=400){
+  const q=`[out:json][timeout:20];(node(around:${raio},${lat},${lon})["historic"];node(around:${raio},${lat},${lon})["tourism"~"^(attraction|museum|artwork|viewpoint|gallery)$"];);out tags 30;`;
   const d=await busca(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
   return (d&&d.elements)||[];
 }
@@ -663,12 +664,13 @@ const ECON_FORTE=["economia","económic","indústria","industrial","agricultura"
 
 function pontua(art,pag,modo){
   const t=(art.title||"").toLowerCase(), ext=pag.extract||"";
+  const cfg=MODOS[modo]||MODOS.pe;
   if(VETO.some(v=>t.includes(v))) return -999;
-  let s=-(art.dist||0)/(modo==="carro"?120:12);
+  let s=-(art.dist||0)/cfg.divisorDist;
   s += ext.length>700?30 : ext.length>350?20 : ext.length>150?8 : -45;
   const cab=ext.slice(0,400).toLowerCase();
   if(BONUS.some(b=>t.includes(b))) s+=22;
-  if(RE_POVOACAO.test(cab)) s+=(modo==="carro"?25:5);
+  if(RE_POVOACAO.test(cab)) s+=cfg.bonusPov;
   if(RE_EXTINTA.test(cab)) s-=55;
   return s;
 }
@@ -693,7 +695,7 @@ async function traduzParaPT(item){
 }
 
 async function escolher(lat,lon,modo){
-  const raio=modo==="carro"?9000:700;
+  const raio=(MODOS[modo]||MODOS.pe).raio;
   // só recua para inglês se o português não encontrou mesmo NADA por perto —
   // uma rua sossegada com 1 artigo em português continua em português
   let lang="pt", arts=await wikiGeo(lat,lon,"pt",raio);
@@ -704,7 +706,8 @@ async function escolher(lat,lon,modo){
   }
   if(!arts.length) return {escolhidos:[],lang,todos:[]};
   const pags=await wikiPaginas(arts.map(a=>a.pageid),lang);
-  const todos=arts.map(a=>({titulo:a.title, texto:(pags[a.pageid]||{}).extract||""}));
+  const todos=arts.map(a=>({titulo:a.title, texto:(pags[a.pageid]||{}).extract||"",
+                             lat:a.lat, lon:a.lon, dist:a.dist}));
   const marc=arts.map(a=>({s:pontua(a,pags[a.pageid]||{},modo),a,p:pags[a.pageid]||{}}))
                  .sort((x,y)=>y.s-x.s);
   const fora=[],vistos=[];
@@ -806,14 +809,14 @@ async function canalHistoria(f){
   // descrições completas, escritas por técnicos, não o resumo da Wikipédia
   if(ehLisboa(f.local)&&f.lat!=null){
     try{
-      const raio=f.modo==="carro"?9000:700;
+      const raio=(MODOS[f.modo]||MODOS.pe).raio;
       for(const it of await patrimonioCML(f.lat,f.lon,raio))
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património CML:",e); }
   }
-  // a pé, se a frente veio pobre em novidades, olha em volta — sem repetir
-  // nada do que já foi escolhido acima nem do que já ouviste antes
-  if(f.modo==="pe"&&f.rumo!=null){
+  // a pé (ou a correr — é gente a pé, só mais depressa), se a frente veio
+  // pobre em novidades, olha em volta — sem repetir o que já foi escolhido
+  if(ehAPe(f.modo)&&f.rumo!=null){
     const novosAteAqui=fora.filter(x=>!S.ditos.has(x.chave)).length;
     if(novosAteAqui<2){
       try{
@@ -1076,12 +1079,61 @@ async function canalActualidade(f){
   }
   return fora;
 }
-async function canalPOI(f,lat,lon){          // só a pé: o que se vê à volta
-  const els=await overpass(lat,lon);
+async function canalPOI(f,lat,lon){          // a pé, a correr ou de bicicleta
+  const els=await overpass(lat,lon, f.modo==="bicicleta"?900:400);
   const nomes=[...new Set(els.map(e=>((e.tags||{}).name)).filter(Boolean))].slice(0,4);
   if(!nomes.length) return [];
   return [{chave:`poi:${nomes[0]}`, texto:`À tua volta: ${nomes.join(", ")}.`}];
 }
+
+/* percursos pedestres, de corrida e ecopistas (OSM/Overpass) — "estás a
+   cruzar a PR5". Nunca inventa o que não vier nos tags do próprio OSM. */
+async function percursoPerto(lat,lon){
+  try{
+    const q=`[out:json][timeout:20];relation(around:300,${lat},${lon})`+
+            `["route"~"^(hiking|foot|bicycle)$"];out tags 5;`;
+    const d=await busca(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+    for(const el of (d&&d.elements)||[]){
+      const t=el.tags||{};
+      if(!t.name&&!t.ref) continue;
+      const chave=`rota:${t.ref||t.name}`;
+      if(S.ditos.has(chave)) continue;
+      marcaDito(chave);
+      const nome=[t.ref,t.name].filter(Boolean).join(" — ");
+      let texto=`Estás a cruzar ${nome}`;
+      if(t.distance) texto+=`, um percurso${t.roundtrip==="yes"?" circular":""} de ${t.distance} quilómetros`;
+      return {chave, texto:texto+"."};
+    }
+  }catch(e){ console.warn("percurso:",e); }
+  return null;
+}
+
+/* radar de raridades: sugere um pequeno desvio quando há algo classificado
+   perto mas fora do caminho — o fluxo normal já cobre o que está à frente,
+   isto cobre o que ficaria por dizer. Nunca de carro; um só por anúncio. */
+const RE_RARIDADE=/monumento nacional|im[óo]vel de interesse p[úu]blico|patrim[óo]nio mundial/i;
+function ladoRelativo(rumoParaAlvo,rumoAtual){
+  const diff=((rumoParaAlvo-rumoAtual+540)%360)-180;   // -180..180, positivo=direita
+  return diff>=0?"à tua direita":"à tua esquerda";
+}
+async function desvioSugerido(todosArtigos,lat,lon,rumo){
+  if(rumo==null||!todosArtigos||!todosArtigos.length) return null;
+  for(const a of todosArtigos){
+    if(a.lat==null||a.dist==null||a.dist<100||a.dist>500) continue;
+    if(!RE_RARIDADE.test(a.texto||"")) continue;
+    const chave=`desvio:${a.titulo}`;
+    if(S.ditos.has(chave)) continue;
+    const rumoParaAlvo=rumoG(lat,lon,a.lat,a.lon);
+    if(anguloEntre(rumoParaAlvo,rumo)<50) continue;   // à frente — o fluxo normal já cobre isto
+    marcaDito(chave);
+    const lado=ladoRelativo(rumoParaAlvo,rumo);
+    const minutos=Math.max(1,Math.round(a.dist/80));  // ~80 m/minuto, a pé ou a correr
+    return {chave, texto:`Vale um desvio: ${lado}, a ${Math.round(a.dist)} metros, `+
+                          `está ${a.titulo}. Cerca de ${minutos} minuto${minutos>1?"s":""} a pé.`};
+  }
+  return null;
+}
+
 function limpaNomeLocal(n){
   n=n.replace(/\s*\(.*?\)\s*$/,"").replace(/^Uni[aã]o (das|de) [Ff]reguesias de\s+/i,"");
   if(n.includes(" e ")) n=n.split(" e ")[0];
@@ -1327,7 +1379,7 @@ async function narrar(f,lat,lon,modo){
       return {canal:c, ...parte(intro+it.texto+liga)};
     }
   }
-  if(modo==="pe"){
+  if(modo!=="carro"){          // a pé, a correr ou de bicicleta — nunca de carro
     for(const it of await canalPOI(f,lat,lon)){
       if(S.ditos.has(it.chave)) continue;
       marcaDito(it.chave);
@@ -1437,8 +1489,11 @@ function salta(){
 /* "conta mais": o oposto de saltar — pede o resto do que ficou por dizer */
 function contaMais(){
   const ua=S.ultimoAnuncio;
-  if(!ua||!ua.resto){ dizJa("Não tenho mais sobre isto."); return; }
+  if(!ua){ dizJa("Não tenho mais sobre isto."); return; }
+  // "conta mais" é sempre sinal de interesse, mesmo quando não há resto
+  // (ex: um desvio sugerido é sempre curto e completo, sem mais a dizer)
   if(ua.canal) reforca(ua.canal,1.08);
+  if(!ua.resto){ dizJa("Não tenho mais sobre isto."); return; }
   dizJa(ua.resto);
   S.ultimoAnuncio={...ua, resto:""};   // já foi dito — não repetir a um novo "conta mais"
 }
@@ -1513,13 +1568,46 @@ function mudaCanal(c){
 }
 
 /* ═══════════════════ companheiro (a lógica central) ═══════════════════ */
-function modoAtual(){ return S.veloc>3?"carro":"pe"; }
-function horizonte(){ return modoAtual()==="carro"?240:60; }
-function passo(){ return modoAtual()==="carro"?4000:130; }
-// quanto se fala de cada vez: a pé há tempo para ouvir mais; de carro,
-// frases curtas — o resto fica disponível por "conta mais"
+/* ═══════════ modos de deslocação: um só sítio para tudo o que muda ═══════════
+   pé, corrida (jogging), bicicleta, carro — cada um com o seu raio de
+   pesquisa, antecipação, cadência de anúncios, e quanto se fala de cada
+   vez. Corrida trata-se como "a pé" para efeitos de rua/bairro e do olhar
+   em volta (é gente a pé, só que mais depressa); bicicleta já não, por ir
+   depressa demais para o pormenor da rua fazer sentido, mas ainda lenta
+   o suficiente para valer a pena avisar de um percurso ou de um desvio. */
+const MODOS={
+  pe:        {raio:700,  horizonte:60,  passo:130,  gancho:2, limite:750, divisorDist:12,  bonusPov:5,  chip:"🚶 a pé"},
+  corrida:   {raio:1000, horizonte:75,  passo:300,  gancho:1, limite:550, divisorDist:20,  bonusPov:8,  chip:"🏃 a correr"},
+  bicicleta: {raio:2000, horizonte:90,  passo:600,  gancho:2, limite:650, divisorDist:60,  bonusPov:15, chip:"🚴 de bicicleta"},
+  carro:     {raio:9000, horizonte:240, passo:4000, gancho:1, limite:450, divisorDist:120, bonusPov:25, chip:"🚗 de carro"},
+};
+function ehAPe(modo){ return modo==="pe"||modo==="corrida"; }
+
+/* histerese: só muda de modo depois de ~20s estável no novo intervalo de
+   velocidade, para não oscilar num semáforo entre "carro" e "bicicleta".
+   Aplica-se só à passagem normal do tempo (novaPosicao); testes e outro
+   código que queiram um modo imediato definem S.modo directamente. */
+function modoPelaVelocidade(v){
+  if(v>8) return "carro";
+  if(v>3.3) return "bicicleta";
+  if(v>1.8) return "corrida";
+  return "pe";
+}
+function actualizaModo(){
+  const alvo=modoPelaVelocidade(S.veloc);
+  if(alvo===S.modo){ S._modoPendente=null; return; }
+  if(alvo!==S._modoPendente){ S._modoPendente=alvo; S._modoPendenteDesde=Date.now(); return; }
+  if(Date.now()-S._modoPendenteDesde>=20000){ S.modo=alvo; S._modoPendente=null; }
+}
+function modoAtual(){ return S.modo; }
+function horizonte(){ return MODOS[modoAtual()].horizonte; }
+function passo(){ return MODOS[modoAtual()].passo; }
+// quanto se fala de cada vez: a pé e de bicicleta há tempo para ouvir
+// mais; a correr e de carro, frases curtas — o resto fica disponível por
+// "conta mais"
 function limitesFala(){
-  return modoAtual()==="carro" ? {gancho:1, limite:450} : {gancho:2, limite:750};
+  const m=MODOS[modoAtual()];
+  return {gancho:m.gancho, limite:m.limite};
 }
 
 async function novaPosicao(lat,lon,tMs,velGps){
@@ -1534,6 +1622,7 @@ async function novaPosicao(lat,lon,tMs,velGps){
     S.dAcum+=d;
   }
   S.ultimaPos={lat,lon,t:tMs};
+  actualizaModo();
   pintaEstado();
   if(!S.anunciando && S.dAcum-S.ultimoAnuncioD>=passo()) anunciar(lat,lon);
 }
@@ -1579,9 +1668,37 @@ async function anunciar(lat,lon){
       if(ef){ const t=paraVoz(ef.texto); regista("HISTORIA","📅 "+t); diz(t,"HISTORIA"); }
     }catch(e){ console.warn("calendário:",e); }
     // a pé, o pormenor da rua onde estás agora
-    if(modo==="pe"){
+    if(ehAPe(modo)){
       const r=await detalheRua(lat,lon,local);
       if(r){ pre+=r.texto+" "; }
+    }
+    // percursos (PR/GR, ecopistas) — a pé, a correr ou de bicicleta
+    if(modo!=="carro"){
+      try{
+        const rota=await percursoPerto(lat,lon);
+        if(rota){
+          const t=paraVoz(rota.texto);
+          regista("HISTORIA","🥾 "+t); diz(t,"HISTORIA");
+        }
+      }catch(e){ console.warn("percurso:",e); }
+    }
+    // radar de raridades: um desvio ocupa o anúncio deste tick — nunca de
+    // carro, e nunca ao mesmo tempo que a narração normal (fila de 1 na voz)
+    let desvio=null;
+    if(modo!=="carro"){
+      try{ desvio=await desvioSugerido(f.todos,lat,lon,S.rumo); }
+      catch(e){ console.warn("desvio:",e); }
+    }
+    if(desvio){
+      // o "finally" da função já repõe S.anunciando/S.ultimoAnuncioD no return
+      // NUNCA prefixar com "pre" aqui — pode ser longo (detalhe da rua) e o
+      // corte por comprimento do paraVoz() comia o próprio desvio antes de
+      // lá chegar, calando exactamente a única coisa que importava dizer
+      const t=paraVoz(desvio.texto);
+      regista("HISTORIA","↪️ "+t);
+      S.ultimoTexto=t; S.ultimoAnuncio={canal:"HISTORIA", gancho:t, resto:""};
+      diz(t,"HISTORIA");
+      return;
     }
     const n=await narrar(f,pla,plo,modo);
     if(n||pre){
@@ -1657,7 +1774,7 @@ function pintaCanais(){
 function pintaSom(){ $("#bSom").textContent=S.silencio?"🔇":"🔊"; $("#bSom").classList.toggle("alerta",S.silencio); }
 function pintaMic(){ $("#bMic").classList.toggle("on",S.micAtivo); $("#chipMic").hidden=!S.micAtivo; }
 function pintaEstado(){
-  $("#chipModo").innerHTML=`<b>${modoAtual()==="carro"?"🚗 carro":"🚶 a pé"}</b>`;
+  $("#chipModo").innerHTML=`<b>${MODOS[modoAtual()].chip}</b>`;
   $("#chipVel").innerHTML=`<b>${Math.round(S.veloc*3.6)}</b> km/h`;
 }
 function pintaDefs(){
