@@ -142,10 +142,22 @@
     <div class="linha"><span>Rua e bairro (a pé)</span><input type="checkbox" data-extra="rua" checked></div>
   </div>
 
+  <h3>Os meus interesses</h3>
+  <p style="color:var(--meia);font-size:13px">Um interesse activo dá prioridade a esses temas no que se conta e no radar de desvios.</p>
+  <div class="linha"><span>Azulejos</span><input type="checkbox" data-interesse="azulejos"></div>
+  <div class="linha"><span>Castelos e fortalezas</span><input type="checkbox" data-interesse="castelos"></div>
+  <div class="linha"><span>Igrejas e conventos</span><input type="checkbox" data-interesse="igrejas"></div>
+  <div class="linha"><span>Arte urbana</span><input type="checkbox" data-interesse="arteUrbana"></div>
+  <div class="linha"><span>Vinho e gastronomia</span><input type="checkbox" data-interesse="vinho"></div>
+  <div class="linha"><span>Natureza e miradouros</span><input type="checkbox" data-interesse="natureza"></div>
+
   <h3>O teu perfil (aprendido com o uso)</h3>
   <p style="color:var(--meia);font-size:13px">Ouvir um canal até ao fim sobe o interesse; «salta» desce-o. A mistura adapta-se sozinha.</p>
   <div id="perfilPesos" style="color:var(--tinta);font-size:14px;padding:6px 0;line-height:1.9"></div>
   <div id="perfilViagens" style="color:var(--meia);font-size:13px;padding-bottom:4px"></div>
+  <div id="perfilPassaporte" style="color:var(--meia);font-size:13px;padding-bottom:4px"></div>
+  <div id="perfilColecoes" style="color:var(--meia);font-size:13px;padding-bottom:4px"></div>
+  <div id="perfilEstatisticas" style="color:var(--meia);font-size:13px;padding-bottom:4px"></div>
   <div class="linha"><button id="bEsquece" style="width:100%;padding:10px;border:0;border-radius:10px;background:#0d1219;color:var(--aviso);font-weight:600;font-size:14px">Esquecer memória de viagens e interesses</button></div>
 
   <h3>Narrador com IA local (experimental)</h3>
@@ -247,14 +259,16 @@ function seccoes(t){
   fora[ult]=(fora[ult]||"")+("\n"+t).slice(pos);
   return fora;
 }
-function paraVoz(t){
+function paraVoz(t,limiteOverride){
   t=(t||"").replace(/https?:\/\/\S+/g,"")
     .replace(/\d{1,3}(?: \d{3})+/g, m=>m.replace(/ /g,""))
     .replace(/hab\.?\s*\/\s*km²/g,"habitantes por quilómetro quadrado")
     .replace(/km²/g,"quilómetros quadrados")
     .replace(/\b(\d+) m\b/g,"$1 metros").replace(/\bkm\/h\b/g,"quilómetros por hora")
     .replace(/[·—↳]/g,", ").replace(/\s+/g," ").trim();
-  const limite=limitesFala().limite;      // depende do modo (pé/carro) — ver mais abaixo
+  // limiteOverride: usado pelo briefing de chegada (4.5), deliberadamente mais
+  // longo (~60s) do que o limite curto do modo actual
+  const limite=limiteOverride||limitesFala().limite;
   if(t.length>limite){ const c=t.slice(0,limite); t=c.slice(0,c.lastIndexOf(".")+1)||c; }
   return t;
 }
@@ -273,14 +287,36 @@ const S = {
   modo:"pe", _modoPendente:null, _modoPendenteDesde:0,   // histerese de modo
   podcasts:[], audioFundo:null,      // {tipo:"radio"|"podcast", nome, indice}
   semNovidadesSeguidas:0,
+  interesses:{},                     // {azulejos:true, ...} — ver INTERESSES
 };
 const NOMES = {HISTORIA:"história", SABORES:"sabores", ECONOMIA:"economia",
                DEMOGRAFIA:"números", ACTUALIDADE:"notícias"};
 
+// interesses declarados (4.1 do plano): regex casa com o título/início do extracto
+// em pontua(); vinho.pesoSabores é um reforço único ao canal SABORES quando activado
+const INTERESSES = {
+  azulejos:   {nome:"azulejos",              regex:/azulej/i},
+  castelos:   {nome:"castelos e fortalezas", regex:/castelo|forte|fortaleza|muralha/i},
+  igrejas:    {nome:"igrejas e conventos",   regex:/igreja|convento|mosteiro|capela/i},
+  arteUrbana: {nome:"arte urbana",           regex:/arte urbana|graffiti|grafiti|mural|street art/i},
+  vinho:      {nome:"vinho e gastronomia",   pesoSabores:1.5},
+  natureza:   {nome:"natureza e miradouros", regex:/miradouro|serra|\brio\b|cascata|parque natural/i},
+};
+
+// colecções verificáveis (4.3) — QIDs confirmados via SPARQL ao Wikidata (não os do plano original,
+// que estavam errados para pelourinho/moinho/aqueduto; ver README, secção Fase 3)
+const COLECOES = {
+  pelourinhos:{qidClasse:"Q241212", singular:"pelourinho",       plural:"pelourinhos",        total:402},
+  castelos:   {qidClasse:"Q23413",  singular:"castelo",          plural:"castelos",           total:195},
+  farois:     {qidClasse:"Q39715",  singular:"farol",            plural:"faróis",             total:84},
+  moinhos:    {qidClasse:"Q38720",  singular:"moinho de vento",  plural:"moinhos de vento",   total:62},
+  aquedutos:  {qidClasse:"Q474",    singular:"aqueduto",         plural:"aquedutos",          total:41},
+};
+
 function guardaPrefs(){
   localStorage.setItem("cv-prefs", JSON.stringify(
     {canal:S.canal, ativos:S.ativos, detalhe:S.detalhe, demo:S.demo,
-     extra:S.extra, lingua:S.lingua, podcasts:S.podcasts}));
+     extra:S.extra, lingua:S.lingua, podcasts:S.podcasts, interesses:S.interesses}));
 }
 function lePrefs(){
   try{
@@ -289,6 +325,7 @@ function lePrefs(){
     Object.assign(S.demo, p.demo||{}); Object.assign(S.extra, p.extra||{});
     if(p.canal&&NOMES[p.canal]) S.canal=p.canal; if(p.lingua) S.lingua=p.lingua;
     if(Array.isArray(p.podcasts)) S.podcasts=p.podcasts;
+    if(p.interesses) Object.assign(S.interesses, p.interesses);
   }catch(e){}
 }
 
@@ -299,7 +336,10 @@ function lePrefs(){
    pesos      → interesse aprendido por canal (salta = desce; ouvir = sobe)  */
 const MESES=["janeiro","fevereiro","março","abril","maio","junho","julho",
              "agosto","setembro","outubro","novembro","dezembro"];
-let M={ditos:{}, visitas:{}, entidades:{}, pesos:{}, podcast:null};   // podcast: {url,titulo,indice,posicao}
+let M={ditos:{}, visitas:{}, entidades:{}, pesos:{}, podcast:null,
+        freguesias:{}, colecoes:{}, stats:{distanciaPorModo:{}, factosOuvidos:0}};
+        // podcast: {url,titulo,indice,posicao}; freguesias: {"concelho/freguesia":timestamp};
+        // colecoes: {pelourinhos:{vistos:{qid:timestamp}}, ...}; stats: distanciaPorModo em metros
 try{ Object.assign(M, JSON.parse(localStorage.getItem("cv-mem")||"{}")); }catch(e){}
 S.ditos=new Set(Object.keys(M.ditos));
 
@@ -329,14 +369,114 @@ function reforca(canal,fator){
   M.pesos[canal]=Math.min(2.5,Math.max(0.3,(M.pesos[canal]||1)*fator));
   guardaMemoria();
 }
+// devolve {texto, primeiraVez} — primeiraVez distingue "nunca visitado antes" de
+// "visitado recentemente" (mesma condição !ultima), usado pelo passaporte (4.2) e
+// pelo briefing de chegada (4.5)
 function saudacaoRegresso(concelho){
   const v=M.visitas[concelho]||[], ultima=v[v.length-1], agora=Date.now();
+  const primeiraVez=!ultima;
   if(!ultima||agora-ultima>20*3600e3){ v.push(agora); M.visitas[concelho]=v.slice(-10); guardaMemoria(); }
   if(ultima&&agora-ultima>20*3600e3){
     const d=new Date(ultima), anoDif=d.getFullYear()!==new Date().getFullYear();
-    return `Já por aqui tinhas passado em ${MESES[d.getMonth()]}${anoDif?" de "+d.getFullYear():""} — desta vez conto-te coisas novas. `;
+    return {texto:`Já por aqui tinhas passado em ${MESES[d.getMonth()]}${anoDif?" de "+d.getFullYear():""} — desta vez conto-te coisas novas. `, primeiraVez};
   }
-  return "";
+  return {texto:"", primeiraVez};
+}
+function registaFreguesia(concelho,freguesia){
+  if(!concelho||!freguesia) return;
+  const chave=`${concelho}/${freguesia}`;
+  if(!M.freguesias[chave]){ M.freguesias[chave]=Date.now(); guardaMemoria(); }
+}
+function concelhosNovosEsteMes(){
+  const agora=new Date(), mes=agora.getMonth(), ano=agora.getFullYear();
+  return Object.values(M.visitas).filter(v=>{
+    if(!v.length) return false;
+    const primeira=new Date(v[0]);
+    return primeira.getMonth()===mes&&primeira.getFullYear()===ano;
+  }).length;
+}
+function acrescentaDistancia(modo,metros){
+  if(!(metros>0)) return;
+  M.stats.distanciaPorModo[modo]=(M.stats.distanciaPorModo[modo]||0)+metros;
+  guardaMemoria();
+}
+const NOME_MODO={pe:"a pé", corrida:"a correr", bicicleta:"de bicicleta", carro:"de carro"};
+function respostaEstatisticas(){
+  const km=Object.entries(M.stats.distanciaPorModo||{}).filter(([,d])=>d>50)
+    .map(([modo,d])=>`${(d/1000).toFixed(1)} quilómetros ${NOME_MODO[modo]||modo}`);
+  const novos=concelhosNovosEsteMes(), factos=M.stats.factosOuvidos||0;
+  const partes=[];
+  if(km.length) partes.push(km.join(", "));
+  partes.push(`${novos} concelho${novos===1?"":"s"} novo${novos===1?"":"s"} este mês`);
+  partes.push(`${factos} facto${factos===1?"":"s"} já ouvido${factos===1?"":"s"} até ao fim`);
+  return "Estatísticas: "+partes.join("; ")+".";
+}
+function respostaPassaporte(){
+  const nC=Object.keys(M.visitas).length, nF=Object.keys(M.freguesias||{}).length;
+  return `O teu passaporte: ${nC} concelho${nC===1?"":"s"} de 308, e ${nF} freguesia${nF===1?"":"s"} visitada${nF===1?"":"s"}.`;
+}
+function respostaColecoes(){
+  const partes=Object.entries(COLECOES).map(([chave,def])=>{
+    const n=Object.keys((M.colecoes[chave]||{}).vistos||{}).length;
+    return n>0?`${n} de ${def.total} ${def.plural}`:null;
+  }).filter(Boolean);
+  return partes.length?`As tuas colecções: ${partes.join("; ")}.`:"Ainda não começaste nenhuma colecção.";
+}
+// verifica se o QID de um item de história pertence a uma das COLECOES (P31 no Wikidata);
+// devolve a frase a acrescentar ao anúncio, "" se já visto, ou null se não pertence/erro
+async function verificaColecao(qid){
+  if(!qid) return null;
+  try{
+    const ent=(await wikidata([qid]))[qid];
+    const tipos=(((ent||{}).claims||{}).P31||[]).map(c=>(((c.mainsnak||{}).datavalue||{}).value||{}).id);
+    for(const [chave,col] of Object.entries(COLECOES)){
+      if(!tipos.includes(col.qidClasse)) continue;
+      if(!M.colecoes[chave]) M.colecoes[chave]={vistos:{}};
+      if(M.colecoes[chave].vistos[qid]) return "";
+      M.colecoes[chave].vistos[qid]=Date.now(); guardaMemoria();
+      const n=Object.keys(M.colecoes[chave].vistos).length;
+      return ` É o ${n}.º ${col.singular} da tua colecção — de ${col.total} classificados em Portugal.`;
+    }
+  }catch(e){ console.warn("colecção:",e); }
+  return null;
+}
+function ativaInteresse(dito,activar){
+  const d=norm(dito);
+  for(const [chave,def] of Object.entries(INTERESSES)){
+    const partes=[def.nome, ...def.nome.split(" e ")].map(norm).filter(p=>p.length>2);
+    if(partes.some(p=>d.includes(p))){
+      S.interesses[chave]=activar; guardaPrefs();
+      if(activar&&def.pesoSabores) reforca("SABORES",def.pesoSabores);
+      dizJa(activar?`Passo a dar mais atenção a ${def.nome}.`:`Deixo de dar prioridade a ${def.nome}.`);
+      pintaDefs();
+      return;
+    }
+  }
+  dizJa("Não reconheci esse tema.");
+}
+// orquestra identidade + história + sabores + números (4.5), para a primeira
+// visita de sempre a um concelho — texto único, mais longo que o normal
+async function montaBriefing(f){
+  const partes=[];
+  const idNome=(f.local&&(f.local.linha||f.local.concelho))||"este lugar";
+  partes.push(`Bem-vindo a ${idNome}.`);
+  try{
+    const hist=await canalHistoria(f);
+    const h=hist&&hist.find(it=>!S.ditos.has(it.chave));
+    if(h){ marcaDito(h.chave); partes.push(h.texto); }
+  }catch(e){ console.warn("briefing história:",e); }
+  try{
+    const sab=await canalSabores(f);
+    const s=sab&&sab.find(it=>!S.ditos.has(it.chave));
+    if(s){ marcaDito(s.chave); partes.push(s.texto); }
+  }catch(e){ console.warn("briefing sabores:",e); }
+  try{
+    const dem=await canalDemografia(f);
+    const d=dem&&dem.find(it=>!S.ditos.has(it.chave));
+    if(d){ marcaDito(d.chave); partes.push(d.texto); }
+  }catch(e){ console.warn("briefing números:",e); }
+  partes.push("Boa descoberta. Diz «conta mais» sobre qualquer tema.");
+  return partes.join(" ");
 }
 
 /* ═══════════════════ fontes (todas gratuitas, com CORS) ═══════════════════ */
@@ -687,6 +827,9 @@ function pontua(art,pag,modo){
   if(BONUS.some(b=>t.includes(b))) s+=22;
   if(RE_POVOACAO.test(cab)) s+=cfg.bonusPov;
   if(RE_EXTINTA.test(cab)) s-=55;
+  for(const [chave,def] of Object.entries(INTERESSES)){
+    if(S.interesses[chave]&&def.regex&&(def.regex.test(t)||def.regex.test(cab))) s+=30;
+  }
   return s;
 }
 /* se um artigo só existe em inglês, tenta encontrar o equivalente em
@@ -805,7 +948,10 @@ async function olharEmVolta(lat,lon,rumo,jaUsados){
       if(!p.extract||p.extract.length<120) continue;
       const diff=anguloEntre(rumoG(lat,lon,a.lat,a.lon),s.centro);
       if(diff>50) continue;                          // fora do sector, não conta
-      const score=p.extract.length-a.dist*3-diff*4;   // perto, bem centrado, com texto
+      let score=p.extract.length-a.dist*3-diff*4;     // perto, bem centrado, com texto
+      const cab=p.extract.slice(0,400).toLowerCase();
+      for(const [chave,def] of Object.entries(INTERESSES))
+        if(S.interesses[chave]&&def.regex&&(def.regex.test(t)||def.regex.test(cab))) score+=300;
       if(score>melhorScore){melhorScore=score; melhor={a,p};}
     }
     if(melhor){
@@ -819,7 +965,7 @@ async function olharEmVolta(lat,lon,rumo,jaUsados){
 
 async function canalHistoria(f){
   const n=[1,3,5][S.detalhe.HISTORIA-1];
-  const fora=f.escolhidos.map(e=>({chave:e.titulo, texto:`${e.titulo}. ${frases(e.texto,n)}`}));
+  const fora=f.escolhidos.map(e=>({chave:e.titulo, texto:`${e.titulo}. ${frases(e.texto,n)}`, qid:e.qid}));
   // Lisboa: reforça com o inventário oficial de património da Câmara —
   // descrições completas, escritas por técnicos, não o resumo da Wikipédia
   if(ehLisboa(f.local)&&f.lat!=null){
@@ -1131,20 +1277,28 @@ function ladoRelativo(rumoParaAlvo,rumoAtual){
   const diff=((rumoParaAlvo-rumoAtual+540)%360)-180;   // -180..180, positivo=direita
   return diff>=0?"à tua direita":"à tua esquerda";
 }
+function casaInteresse(texto){
+  const cab=(texto||"").toLowerCase();
+  return Object.entries(INTERESSES).some(([chave,def])=>S.interesses[chave]&&def.regex&&def.regex.test(cab));
+}
 async function desvioSugerido(todosArtigos,lat,lon,rumo){
   if(rumo==null||!todosArtigos||!todosArtigos.length) return null;
-  for(const a of todosArtigos){
-    if(a.lat==null||a.dist==null||a.dist<100||a.dist>500) continue;
-    if(!RE_RARIDADE.test(a.texto||"")) continue;
-    const chave=`desvio:${a.titulo}`;
-    if(S.ditos.has(chave)) continue;
-    const rumoParaAlvo=rumoG(lat,lon,a.lat,a.lon);
-    if(anguloEntre(rumoParaAlvo,rumo)<50) continue;   // à frente — o fluxo normal já cobre isto
-    marcaDito(chave);
-    const lado=ladoRelativo(rumoParaAlvo,rumo);
-    const minutos=Math.max(1,Math.round(a.dist/80));  // ~80 m/minuto, a pé ou a correr
-    return {chave, texto:`Vale um desvio: ${lado}, a ${Math.round(a.dist)} metros, `+
-                          `está ${a.titulo}. Cerca de ${minutos} minuto${minutos>1?"s":""} a pé.`};
+  // os interesses activos têm prioridade: tenta primeiro só entre eles
+  const candidatos=todosArtigos.filter(a=>casaInteresse(a.texto));
+  for(const lista of [candidatos, todosArtigos]){
+    for(const a of lista){
+      if(a.lat==null||a.dist==null||a.dist<100||a.dist>500) continue;
+      if(!RE_RARIDADE.test(a.texto||"")) continue;
+      const chave=`desvio:${a.titulo}`;
+      if(S.ditos.has(chave)) continue;
+      const rumoParaAlvo=rumoG(lat,lon,a.lat,a.lon);
+      if(anguloEntre(rumoParaAlvo,rumo)<50) continue;   // à frente — o fluxo normal já cobre isto
+      marcaDito(chave);
+      const lado=ladoRelativo(rumoParaAlvo,rumo);
+      const minutos=Math.max(1,Math.round(a.dist/80));  // ~80 m/minuto, a pé ou a correr
+      return {chave, texto:`Vale um desvio: ${lado}, a ${Math.round(a.dist)} metros, `+
+                            `está ${a.titulo}. Cerca de ${minutos} minuto${minutos>1?"s":""} a pé.`};
+    }
   }
   return null;
 }
@@ -1391,7 +1545,11 @@ async function narrar(f,lat,lon,modo){
       // de assunto em silêncio (foi o que confundiu sabores com história)
       if(c!==S.canal) intro=`Sem novidades de ${NOMES[S.canal]} por aqui — `+
                              `sobre ${NOMES[c]}: `+intro;
-      return {canal:c, ...parte(intro+it.texto+liga)};
+      let extraColecao="";
+      if(c==="HISTORIA"&&it.qid){
+        try{ extraColecao=await verificaColecao(it.qid)||""; }catch(e){ console.warn("colecção:",e); }
+      }
+      return {canal:c, ...parte(intro+it.texto+liga+extraColecao)};
     }
   }
   if(modo!=="carro"){          // a pé, a correr ou de bicicleta — nunca de carro
@@ -1604,7 +1762,10 @@ function _falaAgora(texto,canal){
   u.onstart=()=>{ pausaOuvido(); duckAudio(true); };
   u.onend=u.onerror=()=>{
     // ouvir até ao fim é o sinal positivo mais honesto que existe
-    if(!falaCancelada&&falaCanal){ reforca(falaCanal,1.04); S.saltos[falaCanal]=0; }
+    if(!falaCancelada&&falaCanal){
+      reforca(falaCanal,1.04); S.saltos[falaCanal]=0;
+      M.stats.factosOuvidos=(M.stats.factosOuvidos||0)+1; guardaMemoria();
+    }
     aFalar=false; falaCanal=null; retomaOuvido();
     if(filaFala.length){ aFalar=true; const p=filaFala.shift(); _falaAgora(p.t,p.c); }
     else duckAudio(false);      // só repõe o volume quando a fila esvazia de vez
@@ -1683,6 +1844,14 @@ function pausaOuvido(){ if(rec&&S.micAtivo){recPausado=true; try{rec.abort();}ca
 function retomaOuvido(){ if(rec&&S.micAtivo){recPausado=false; setTimeout(()=>{try{rec.start();}catch(e){}},250);} }
 
 const COMANDOS=[
+  // têm de vir ANTES de todos os comandos de troca de canal a seguir: "interessa-me
+  // vinho e gastronomia" contém "gastronomia" e seria apanhado por engano pelo
+  // comando de canal SABORES; o mesmo risco existe para passaporte/colecções/estatísticas
+  [/interessa-?me|passei a interessar-?me|tenho interesse em/, dito=>ativaInteresse(dito,true)],
+  [/deixou de me interessar|ja nao me interessa/,            dito=>ativaInteresse(dito,false)],
+  [/passaporte/,             ()=>dizJa(respostaPassaporte())],
+  [/coleccoes|colecoes/,     ()=>dizJa(respostaColecoes())],
+  [/quanto andei|estatisticas de viagem|minhas estatisticas/, ()=>dizJa(respostaEstatisticas())],
   [/historia/,               ()=>mudaCanal("HISTORIA")],
   [/gastronomia|sabores|comida|tradicoes|festas/, ()=>mudaCanal("SABORES")],
   [/economia/,               ()=>mudaCanal("ECONOMIA")],
@@ -1717,12 +1886,12 @@ const COMANDOS=[
   [/esquece (a )?memoria/,   ()=>{$("#bEsquece").click(); dizJa("Esqueci tudo o que sabia de ti.");}],
   [/salta|proximo|passa/,    ()=>{salta(); regista("cmd","Saltado.");}],
   [/repete/,                 ()=>{if(S.ultimoTexto) dizJa(S.ultimoTexto);}],
-  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, conta mais, conta menos, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, repete, rádio, outra estação, podcast, próximo episódio, ou abre o Spotify.")],
+  [/ajuda|menu/,             ()=>dizJa("Podes dizer: história, economia, demografia, notícias, conta mais, conta menos, mais detalhe, menos detalhe, sem densidade populacional, silêncio, fala, salta, repete, rádio, outra estação, podcast, próximo episódio, abre o Spotify, interessa-me tal tema, passaporte, colecções, ou quanto andei.")],
 ];
 function comando(dito){
   const d=norm(dito);
   for(const [re,fn] of COMANDOS)
-    if(re.test(d)){ regista("cmd",`🎙 «${dito.trim()}»`); fn(); return; }
+    if(re.test(d)){ regista("cmd",`🎙 «${dito.trim()}»`); fn(dito); return; }
 }
 function afinaDemo(chave,valor,resposta){
   S.demo[chave]=valor; guardaPrefs(); pintaDefs(); dizJa(resposta);
@@ -1786,6 +1955,7 @@ async function novaPosicao(lat,lon,tMs,velGps){
     }
     if(d>5) S.rumo=rumoG(u.lat,u.lon,lat,lon);
     S.dAcum+=d;
+    acrescentaDistancia(modoAtual(),d);
   }
   S.ultimaPos={lat,lon,t:tMs};
   actualizaModo();
@@ -1807,13 +1977,20 @@ async function anunciar(lat,lon){
               latAtual:lat,lonAtual:lon,rumo:S.rumo};
     $("#chipLocal").textContent=local.linha;
 
-    let pre="";
+    let pre="", ehBriefing=false;
     if(local.concelho&&local.concelho!==S.ultimoConcelho){
       pre=S.ultimoConcelho?`Estamos a chegar ao concelho de ${local.concelho}. `
                           :`Estás perto de ${local.linha}. `;
-      pre+=saudacaoRegresso(local.concelho);      // "já por aqui passaste em…"
+      const saudacao=saudacaoRegresso(local.concelho);      // "já por aqui passaste em…"
+      pre+=saudacao.texto;
+      if(saudacao.primeiraVez){
+        ehBriefing=true;
+        const totalConcelhos=Object.keys(M.visitas).length;
+        pre+=`É o teu ${totalConcelhos}.º concelho — ainda te faltam ${Math.max(0,308-totalConcelhos)}. `;
+      }
       S.ultimoConcelho=local.concelho;
     }
+    if(local.freguesia&&local.concelho) registaFreguesia(local.concelho,local.freguesia);
     // 1.º os avisos (IPMA, incêndios) — segurança fala antes de tudo
     for(const av of await avisosZona(f,lat,lon)){
       marcaDito(av.chave);
@@ -1866,12 +2043,23 @@ async function anunciar(lat,lon){
       diz(t,"HISTORIA");
       return;
     }
-    const n=await narrar(f,pla,plo,modo);
+    let n=null;
+    if(ehBriefing){
+      try{
+        const textoBriefing=await montaBriefing(f);
+        n={canal:"HISTORIA", gancho:textoBriefing, resto:""};
+      }catch(e){ console.warn("briefing:",e); n=await narrar(f,pla,plo,modo); }
+    }else{
+      n=await narrar(f,pla,plo,modo);
+    }
     if(n||pre){
       S.semNovidadesSeguidas=0;
-      // fala-se só o gancho; o resto (se houver) fica à espera de "conta mais"
-      let txt=paraVoz(pre+((n&&n.gancho)||""));
-      txt=paraVoz(await narraIA(txt));    // IA local reescreve; se falhar, fica igual
+      // fala-se só o gancho; o resto (se houver) fica à espera de "conta mais".
+      // o briefing de chegada (4.5) é deliberadamente mais longo (~60s) — não
+      // se corta pelo limite curto do modo actual, só por um tecto generoso
+      const limite=ehBriefing?1600:undefined;
+      let txt=paraVoz(pre+((n&&n.gancho)||""),limite);
+      txt=paraVoz(await narraIA(txt),limite);    // IA local reescreve; se falhar, fica igual
       regista((n&&n.canal)||"LOCAL",txt);
       S.ultimoTexto=txt;
       S.ultimoAnuncio={canal:(n&&n.canal)||null, gancho:txt, resto:paraVoz((n&&n.resto)||"")};
@@ -1962,6 +2150,7 @@ function pintaDefs(){
   document.querySelectorAll("[data-detalhe]").forEach(x=>x.value=S.detalhe[x.dataset.detalhe]);
   document.querySelectorAll("[data-demo]").forEach(x=>x.checked=S.demo[x.dataset.demo]);
   document.querySelectorAll("[data-extra]").forEach(x=>x.checked=S.extra[x.dataset.extra]);
+  document.querySelectorAll("[data-interesse]").forEach(x=>x.checked=!!S.interesses[x.dataset.interesse]);
   $("#selLingua").value=S.lingua;
   // perfil aprendido: pesos em percentagem + resumo das viagens memorizadas
   const soma=Object.keys(NOMES).reduce((a,c)=>a+(M.pesos[c]||1),0);
@@ -1972,6 +2161,9 @@ function pintaDefs(){
   }).join("<br>");
   const nV=Object.keys(M.visitas).length, nF=Object.keys(M.ditos).length;
   $("#perfilViagens").textContent=nV?`Memória: ${nV} concelhos visitados, ${nF} factos já contados.`:"Ainda sem viagens memorizadas.";
+  const elP=$("#perfilPassaporte"); if(elP) elP.textContent=respostaPassaporte();
+  const elC=$("#perfilColecoes"); if(elC) elC.textContent=respostaColecoes();
+  const elE=$("#perfilEstatisticas"); if(elE) elE.textContent=respostaEstatisticas();
   pintaPodcasts();
 }
 function pintaPodcasts(){
@@ -1992,6 +2184,12 @@ function pintaPodcasts(){
 
 document.querySelectorAll("[data-canal]").forEach(b=>
   b.onclick=()=>{S.ativos[b.dataset.canal]=true; mudaCanal(b.dataset.canal);});
+document.querySelectorAll("[data-interesse]").forEach(x=>
+  x.onchange=()=>{
+    const chave=x.dataset.interesse, def=INTERESSES[chave];
+    S.interesses[chave]=x.checked; guardaPrefs();
+    if(x.checked&&def&&def.pesoSabores) reforca("SABORES",def.pesoSabores);
+  });
 $("#bSalta").onclick=()=>{salta(); regista("cmd","Saltado.");};
 $("#bContaMais").onclick=()=>contaMais();
 $("#bTocaRadio").onclick=()=>tocaRadio();
@@ -2017,8 +2215,9 @@ $("#chkIA").onchange=e=>{
   } else pintaIA("desligado");
 };
 $("#bEsquece").onclick=()=>{
-  M={ditos:{}, visitas:{}, entidades:{}, pesos:{}};
-  S.ditos.clear(); localStorage.removeItem("cv-mem");
+  M={ditos:{}, visitas:{}, entidades:{}, pesos:{}, podcast:null,
+     freguesias:{}, colecoes:{}, stats:{distanciaPorModo:{}, factosOuvidos:0}};
+  S.ditos.clear(); S.interesses={}; guardaPrefs(); localStorage.removeItem("cv-mem");
   pintaDefs(); regista("cmd","Memória de viagens e interesses esquecida.");
 };
 $("#defs").onclick=e=>{if(e.target.id==="defs") $("#defs").classList.remove("aberto");};

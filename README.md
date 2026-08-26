@@ -6,6 +6,81 @@ Três programas, três perguntas:
 2. **`companheiro.py`** — funciona como companheiro contínuo, sem destino, com voz? (Sim.)
 3. **`webapp/`** — corre num smartphone, sem loja de apps? (Sim — ver abaixo.)
 
+## Fase 3 do PLANO-EXECUCAO.md — concluída (agosto 2026)
+
+Interesses declarados, passaporte de território, colecções verificáveis,
+estatísticas de viagem, e um briefing de chegada para a primeira vez que
+se visita um concelho.
+
+- **Interesses declarados**: seis temas (azulejos, castelos e fortalezas,
+  igrejas e conventos, arte urbana, vinho e gastronomia, natureza e
+  miradouros) activáveis em ⚙ ou por voz («interessa-me X» / «deixou de
+  me interessar X»). Um interesse activo soma +30 à pontuação de um
+  artigo em `pontua()`, tem prioridade no "olhar em volta" e no radar de
+  desvios (testei: um castelo mais distante venceu um miradouro mais
+  perto só por ter o interesse activo). "Arte urbana" é uma simplificação
+  honesta: em vez de uma consulta Overpass dedicada a `tourism=artwork`,
+  usa o mesmo casamento de texto que os outros temas — a app já cobre
+  esse tag no canal de POIs, mas não priorizava por ele antes desta fase.
+  "Vinho e gastronomia" não tem regex — activa-lo dá um reforço único
+  (×1,5) ao peso do canal SABORES.
+- **Passaporte de território**: na primeira visita de sempre a um
+  concelho, o anúncio inclui "É o teu N.º concelho — ainda te faltam
+  308-N." `M.freguesias` regista as freguesias visitadas (sem anúncio de
+  voz próprio — seria repetitivo de mais). Comando «passaporte».
+- **Colecções verificáveis**: pré-requisito cumprido primeiro — validei
+  ao vivo por SPARQL no Wikidata os QIDs de 5 tipos de monumento
+  classificado em Portugal com coordenadas. Descobri que o próprio plano
+  tinha adivinhado errado 3 dos 5 QIDs (comparado com o real, via
+  `rdfs:label`):
+
+  | Colecção | QID usado (o do plano, se diferente) | Instâncias em PT com coordenadas |
+  |---|---|---|
+  | pelourinho | Q241212 (plano tinha Q1782709, errado) | 402 |
+  | castelo | Q23413 (correcto) | 195 |
+  | farol | Q39715 (correcto) | 84 |
+  | moinho de vento | Q38720 (plano tinha Q42517, errado) | 62 |
+  | aqueduto | Q474 (plano tinha Q474764, errado) | 41 |
+
+  Quando um item de história falado tem QID do Wikidata e esse QID
+  pertence a uma destas classes (`P31`), o anúncio ganha "É o N.º
+  pelourinho da tua colecção — de 402 classificados em Portugal." Testado
+  ao vivo com um pelourinho real (Q11789, Couto de Esteves): primeira vez
+  → frase completa; segunda vez com o mesmo QID → sem repetir. Comando
+  «colecções».
+- **Estatísticas de viagem**: `M.stats` acumula metros por modo (pé,
+  corrida, bicicleta, carro) a cada posição nova, e factos ouvidos até ao
+  fim (o mesmo sinal que já reforçava pesos). Concelhos novos este mês
+  derivam de `M.visitas` (primeira visita de cada concelho cai ou não no
+  mês corrente) — não há contador à parte para não duplicar a fonte de
+  verdade. Comando «quanto andei» ou «estatísticas de viagem» (tive de
+  evitar a palavra "estatísticas" sozinha, que já mudava para o canal
+  Números).
+- **Briefing de chegada**: na primeira visita de sempre a um concelho,
+  em vez do fluxo normal, monta-se um único texto mais longo (identidade
+  + 1 facto de história + 1 sabor + números do INE, já com a comparação a
+  Lisboa que o canal Números já fazia) — testado ao vivo em Sintra, com
+  dados reais: identidade, a Estação Ferroviária de Sintra, os
+  travesseiros da Casa Piriquita, e 385606 habitantes segundo o INE.
+  Como este texto é deliberadamente mais longo (~60s) do que o limite
+  normal do modo actual, `paraVoz()` ganhou um segundo parâmetro
+  opcional (o limite de corte) só para este caso — sem ele, o corte por
+  comprimento do modo a pé (750 caracteres) cortava o briefing a meio e
+  engolia o fecho "Boa descoberta, diz conta mais" (confirmei o bug antes
+  de o corrigir: sem o parâmetro, um briefing real de 811 caracteres
+  ficava cortado a 611).
+- **Bug de colisão de comandos encontrado e corrigido**: "interessa-me
+  vinho e gastronomia" era apanhado pelo comando de troca de canal
+  SABORES (que testa a palavra "gastronomia"), porque os comandos de
+  canal vinham antes na lista. Os novos comandos (interesses, passaporte,
+  colecções, estatísticas) tiveram de passar para o TOPO da lista de
+  comandos de voz — confirmado com teste ao vivo antes e depois da
+  correcção.
+- Testado: os 5 critérios de aceitação da Fase 3 (F3.1–F3.5) com dados
+  reais (Wikidata, Wikipédia, INE) — nenhum simulado; regressão
+  amostrada nas funções tocadas (pontua, olharEmVolta, narrar, paraVoz,
+  dedupe persistente, respeito por canais desligados) sem quebras.
+
 ## Fase 4 do PLANO-EXECUCAO.md — concluída (agosto 2026)
 
 Rádio e podcasts a tocar dentro da própria app, com *ducking* automático
