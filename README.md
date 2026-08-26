@@ -6,6 +6,40 @@ Três programas, três perguntas:
 2. **`companheiro.py`** — funciona como companheiro contínuo, sem destino, com voz? (Sim.)
 3. **`webapp/`** — corre num smartphone, sem loja de apps? (Sim — ver abaixo.)
 
+## Fase 2 do PLANO-EXECUCAO.md — concluída (agosto 2026)
+
+Modo corrida (jogging), bicicleta, percursos pedestres/ciclovias do OSM, e
+radar de desvio para monumentos classificados fora do caminho.
+
+- **Jogging como modo próprio**, pedido pelo João a meio da execução — o
+  plano original só previa pé/bicicleta/carro. Corrida (1,8–3,3 m/s,
+  ≈6,5–12 km/h) trata-se como "a pé" para a rua/bairro e o olhar em volta
+  (é gente a pé, só mais depressa), mas com cadência e gancho próprios
+  (1 frase, 550 caracteres — mais curto que a pé, porque a respirar fundo
+  não se processa tanta informação de uma vez).
+- Detecção por velocidade com **histerese real** (`S.modo`, actualizado em
+  `novaPosicao`): só muda de modo ao fim de ~20s estável no novo
+  intervalo, para não oscilar num semáforo entre carro e bicicleta.
+- **Percursos** (PR/GR, ecopistas): consulta nova ao Overpass
+  (`route=hiking|foot|bicycle`), testada ao vivo antes de integrar — a
+  Serra de Sintra devolveu o PR2SNT e o PR3SNT reais, com nome, referência
+  e distância. "Estás a cruzar o PR2SNT — Pena, um percurso circular de
+  4,5 quilómetros." Nunca de carro.
+- **Radar de desvio**: quando há um Monumento Nacional/Imóvel de Interesse
+  Público perto mas fora do caminho, sugere um pequeno desvio com o lado
+  certo ("à tua esquerda, a 300 metros…"), calculado pelo rumo real, não
+  adivinhado. Nunca de carro; um só por anúncio.
+- **Bug real apanhado a testar**: a primeira versão do desvio prefixava o
+  texto da rua (que pode ser longo) ao texto do desvio, e o corte por
+  comprimento do modo corrida (550 caracteres) comia o próprio desvio
+  antes de lá chegar — calando exactamente a única coisa que importava
+  dizer. Corrigido para o desvio nunca depender do que vier antes.
+- Testado: 14/14 da regressão (2 momentaneamente inconclusivos por
+  bloqueio temporário do `r.jina.ai` ao `news.google.com`, causado pelo
+  volume de testes de hoje — confirmado pelo próprio erro da fonte, não
+  pelo código) e 6/6 dos critérios de aceitação da Fase 2, incluindo o
+  modo corrida de ponta a ponta.
+
 ## Fase 1 do PLANO-EXECUCAO.md — concluída (agosto 2026)
 
 Gancho curto + «conta mais»/«conta menos» + duração adaptativa ao modo +
