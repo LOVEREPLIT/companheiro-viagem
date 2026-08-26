@@ -112,14 +112,51 @@ imaterial: lendas, festas, artes populares).
   num dialecto próprio (aspas simples, campos de texto em formato de
   dicionário Python) — escrevi um parser dedicado para isto, testado
   contra 7 registos reais antes de confiar nele.
-- **Coimbra, Braga, Guimarães, Évora, Faro — descartados.** Nenhum tem um
-  catálogo de dados abertos real com património ou toponímia. Guimarães
-  tem um portal de dados abertos real (`sig.cm-guimaraes.pt/dadosabertos`)
-  mas as suas 13 categorias são todas de equipamentos/administração, nada
-  de património. Braga só tem um visualizador de mapas, não um catálogo.
-  Évora tem uma referência a um serviço ArcGIS de terceiros que já não
-  existe (404 confirmado). Nenhum hub inventado — tudo verificado ao vivo
-  antes de descartar.
+- **Cascais — integrado.** Portal CKAN próprio (`dadosabertos.cascais.pt`)
+  com o dataset "Património Cultural Classificado". Ao contrário de
+  Lisboa/Porto só tem nome + categoria legal (ex: "CIM- Conjunto de
+  Interesse Municipal"), sem texto descritivo — por isso o anúncio é mais
+  curto, ao estilo das "casas religiosas" que já existiam para Lisboa.
+  Descoberta técnica: o recurso `.geojson` do dataset tem um tipo de
+  conteúdo bloqueado no plano grátis do corsproxy.io ("This content type
+  is not allowed on the free plan"); o recurso irmão `.json` (o mesmo
+  GeoJSON, só muda a extensão declarada) passa sem problema — só descobri
+  isto ao testar os dois ao vivo. Testado com dados reais a 500 m de um
+  ponto em Cascais: 3 monumentos devolvidos, incluindo dois moinhos de
+  vento e uma azenha.
+- **Sesimbra — integrado, por rua (não por concelho).** O projecto
+  municipal real "Ruas com História" (`ruascomhistoria.sesimbra.pt`) é um
+  WordPress com API REST aberta — a única fonte desta secção sem qualquer
+  bloqueio de CORS, sem precisar de proxy nenhum. Só cobre a vila de
+  Sesimbra por agora (o projecto está a expandir a outras freguesias).
+  Integrado no mecanismo de "detalhe da rua" (o mesmo que já existia só
+  para Lisboa) por pesquisa de slug exacto — testado com 3 ruas reais,
+  2 encontradas (a 3.ª, "Rua Direita", já não existe com esse nome, foi
+  renomeada há muito para "Rua da República" — a falha é esperada e
+  correcta, não um bug). Testado o fluxo completo: `detalheRua` numa
+  posição real da Avenida da Liberdade em Sesimbra devolveu a história
+  real da avenida (o antigo Ribeiro da Misericórdia coberto, o nome
+  original "Avenida da Boa Esperança").
+- **Coimbra, Braga, Guimarães, Évora, Faro — descartados** (primeira
+  ronda). Nenhum tem um catálogo de dados abertos real com património ou
+  toponímia. Guimarães tem um portal de dados abertos real
+  (`sig.cm-guimaraes.pt/dadosabertos`) mas as suas 13 categorias são todas
+  de equipamentos/administração, nada de património. Braga só tem um
+  visualizador de mapas, não um catálogo. Évora tem uma referência a um
+  serviço ArcGIS de terceiros que já não existe (404 confirmado).
+- **Oeiras, Viseu/CIM Viseu Dão Lafões — descartados** (segunda ronda,
+  mais ~35 concelhos investigados). Ambos têm portais CKAN reais, mas sem
+  nada de património/toponímia com texto — Oeiras só tem geometria de
+  arruamentos (sem história), Viseu devolve zero resultados para
+  "património" no seu próprio motor de busca. Os restantes ~30 concelhos
+  investigados (Setúbal, Sintra, Matosinhos, Vila Nova de Gaia, Aveiro,
+  Leiria, Santarém, Portimão, Almada, Viana do Castelo, Elvas, Beja,
+  Chaves, Bragança, Vila Real, Loures, Barcelos, Vila do Conde, Torres
+  Vedras, Peniche, Ourém/Fátima, Portalegre, Castelo Branco, Covilhã,
+  Marvão, Reguengos de Monsaraz, Tomar, Amarante, Lagos, Tavira, Silves):
+  nenhum catálogo real e útil encontrado, ou só visualizadores de mapa sem
+  dados descarregáveis. Nenhum hub nem URL inventado em nenhuma ronda —
+  tudo verificado ao vivo (`fetch()` real) antes de integrar ou descartar.
 
 ### 6.4 Desemprego por concelho (IEFP) — descartado
 O catálogo `dados.gov.pt` só tem 2 conjuntos de dados ligados ao IEFP, sem

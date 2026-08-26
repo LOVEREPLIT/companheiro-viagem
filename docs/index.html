@@ -625,6 +625,65 @@ async function patrimonioPorto(lat,lon,raioM){
   return fora;
 }
 
+/* Cascais (Fase 5, secção 6.3, retomada) — dados abertos REAIS num portal
+   CKAN próprio (dadosabertos.cascais.pt). Ao contrário de Lisboa/Porto, o
+   dataset "Património Cultural Classificado" só tem nome + categoria legal
+   (ex: "CIM- Conjunto de Interesse Municipal") — sem texto descritivo — por
+   isso o anúncio é mais curto, ao estilo das "casas religiosas" de Lisboa.
+   O ficheiro ".geojson" tem um tipo de conteúdo bloqueado no plano grátis
+   do corsproxy.io; o recurso irmão ".json" (mesmo conteúdo GeoJSON, só
+   muda a extensão/tipo declarado) passa sem problema — descoberto ao vivo. */
+function ehCascais(local){ return norm((local&&local.concelho)||"")==="cascais"; }
+const CASCAIS_PATRIMONIO_JSON="https://dadosabertos.cascais.pt/dataset/d2f3eed4-2d21-4a2d-854b-f12bee776825/resource/e58df9f0-f3b2-46c0-904b-26e5a4f9cceb/download/geocascais-condpatrimoniocultural2022_20260825_172720.json";
+async function _corsproxyTexto(url){
+  const chave="corsproxy:"+url;
+  if(cache.has(chave)) return cache.get(chave);
+  let t=null;
+  try{
+    const r=await fetch("https://corsproxy.io/?url="+encodeURIComponent(url));
+    t=r.ok?await r.text():null;
+  }catch(e){ console.warn("corsproxy:",e); }
+  cache.set(chave,t);
+  return t;
+}
+async function patrimonioCascais(lat,lon,raioM){
+  const texto=await _corsproxyTexto(CASCAIS_PATRIMONIO_JSON);
+  if(!texto) return [];
+  let d; try{ d=JSON.parse(texto); }catch(e){ return []; }
+  const fora=[];
+  for(const feat of (d&&d.features)||[]){
+    const bbox=feat.bbox;
+    if(!bbox||bbox.length<4) continue;
+    const clat=(bbox[1]+bbox[3])/2, clon=(bbox[0]+bbox[2])/2;
+    if(distM(lat,lon,clat,clon)>raioM) continue;
+    const p=feat.properties||{};
+    const nome=p.designacao;
+    if(!nome||fora.some(x=>x.chave===nome)) continue;
+    const categoria=(p.tipologia||"").replace(/^[A-Z]{2,4}-\s*/,"").trim();
+    fora.push({chave:nome, texto:`${nome}, património classificado${categoria?" como "+categoria.toLowerCase():""}, em Cascais.`});
+  }
+  return fora;
+}
+
+/* Sesimbra (Fase 5, secção 6.3, retomada) — "Ruas com História", projecto
+   municipal real (ruascomhistoria.sesimbra.pt), um WordPress com API REST
+   ABERTA (sem CORS bloqueado, ao contrário de todas as outras fontes desta
+   secção — não precisa de proxy nenhum). Só cobre a vila de Sesimbra por
+   agora; pesquisa por slug exacto (ex: "Rua da República"→"rua-da-republica"),
+   falha em silêncio nas ruas ainda não cobertas pelo projecto. */
+function ehSesimbra(local){ return norm((local&&local.concelho)||"")==="sesimbra"; }
+function _slugRua(nome){ return norm(nome).replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
+async function ruaSesimbra(nomeRua){
+  const slug=_slugRua(nomeRua);
+  if(!slug) return null;
+  const d=await busca(`https://ruascomhistoria.sesimbra.pt/wp-json/wp/v2/posts?slug=${slug}`);
+  const post=(d||[])[0];
+  const html=post&&post.content&&post.content.rendered;
+  if(!html) return null;
+  const texto=new DOMParser().parseFromString(html,"text/html").body.textContent.replace(/\s+/g," ").trim();
+  return texto.length>40?texto:null;
+}
+
 async function arcgisPerto(url,lat,lon,raioM,outFields){
   const q=`${url}/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326`+
           `&spatialRel=esriSpatialRelIntersects&distance=${raioM}&units=esriSRUnit_Meter`+
@@ -1210,6 +1269,13 @@ async function canalHistoria(f){
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património Porto:",e); }
   }
+  if(ehCascais(f.local)&&f.lat!=null){
+    try{
+      const raio=(MODOS[f.modo]||MODOS.pe).raio;
+      for(const it of await patrimonioCascais(f.lat,f.lon,raio))
+        if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
+    }catch(e){ console.warn("património Cascais:",e); }
+  }
   // a pé (ou a correr — é gente a pé, só mais depressa), se a frente veio
   // pobre em novidades, olha em volta — sem repetir o que já foi escolhido
   if(ehAPe(f.modo)&&f.rumo!=null){
@@ -1658,6 +1724,22 @@ async function detalheRua(lat,lon,local){
         return {chave, texto};
       }
     }catch(e){ console.warn("toponímia CML:",e); }
+  }
+  // 0.5) Sesimbra: projecto municipal "Ruas com História" — WordPress com
+  // API REST real e aberta (sem proxy — CORS já vem aberto de origem). Só
+  // cobre a vila de Sesimbra por agora (o projecto está a expandir a
+  // outras freguesias); nas restantes ruas simplesmente não encontra nada
+  // e o fluxo segue para os passos seguintes, sem barulho nenhum.
+  if(ehSesimbra(local)){
+    try{
+      const artigo=await ruaSesimbra(rua);
+      if(artigo){
+        texto+=` ${frases(artigo,3)}`;
+        marcaDito(`sesimbra-rua:${rua}`);
+        registaEntidade(rua,bairro||S.ultimoConcelho);
+        return {chave, texto};
+      }
+    }catch(e){ console.warn("ruas com história Sesimbra:",e); }
   }
 
   // 1) a rua tem nome de pessoa? é o pormenor que mais vale a pena contar
