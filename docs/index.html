@@ -680,11 +680,11 @@ const CASCAIS_PATRIMONIO_JSON="https://dadosabertos.cascais.pt/dataset/d2f3eed4-
 async function _corsproxyTexto(url){
   const chave="corsproxy:"+url;
   if(cache.has(chave)) return cache.get(chave);
-  let t=null;
-  try{
-    const r=await fetch("https://corsproxy.io/?url="+encodeURIComponent(url));
-    t=r.ok?await r.text():null;
-  }catch(e){ console.warn("corsproxy:",e); }
+  /* o corsproxy.io passou a exigir chave (401, confirmado 08/10/2026) —
+     o r.jina.ai devolve o mesmo JSON, só embrulhado num cabeçalho de leitura */
+  let t=await textoViaProxy(url);
+  const marca="Markdown Content:\n", i=(t||"").indexOf(marca);
+  if(i>=0) t=t.slice(i+marca.length);
   cache.set(chave,t);
   return t;
 }
@@ -984,8 +984,6 @@ async function avisosIPMA(distrito){
 async function textoViaProxy(urlAlvo){
   const proxies=[
     u=>`https://r.jina.ai/${u}`,
-    u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   ];
   for(const faz of proxies){
     try{
@@ -1118,11 +1116,7 @@ async function noticiasPara(nome){
   const rss=`https://news.google.com/rss/search?q=${encodeURIComponent(`"${nome}" when:120d`)}&hl=pt-PT&gl=PT&ceid=PT:pt-150`;
   let t=await busca(`https://r.jina.ai/${rss}`,"texto");
   if(t&&t.length>200){ const it=parseNoticiasMarkdown(t); if(it.length) return it; }
-  t=await busca(`https://corsproxy.io/?url=${encodeURIComponent(rss)}`,"texto");
-  if(t){ const it=parseNoticiasXML(t); if(it.length) return it; }
-  t=await busca(`https://api.allorigins.win/raw?url=${encodeURIComponent(rss)}`,"texto");
-  if(t){ const it=parseNoticiasXML(t); if(it.length) return it; }
-  return [];
+  return [];   // corsproxy.io (401, exige chave) e allorigins (em baixo) retirados em 08/10/2026
 }
 /* notícias a sério locais: tenta a freguesia primeiro (mais próxima de ti);
    se estiver deserta de cobertura, sobe ao concelho e depois ao distrito —
