@@ -503,9 +503,51 @@ async function montaBriefing(f){
 /* ═══════════════════ fontes (todas gratuitas, com CORS) ═══════════════════ */
 const cache=new Map(), _ult={};
 const RITMO={"nominatim.openstreetmap.org":1200,"overpass-api.de":2000};
+/* Cache persistente (localStorage, ~1,2 MB, LRU): o que NÃO muda de hora para hora
+   (Wikipédia, Wikidata, OSM, câmaras) sobrevive entre viagens e responde em 0 ms.
+   Dados vivos (avisos, incêndios, tempo) nunca entram. TTL por tipo de fonte. */
+const TTL_H={"nominatim.openstreetmap.org":168,"pt.wikipedia.org":168,"en.wikipedia.org":168,
+  "query.wikidata.org":168,"www.wikidata.org":168,"overpass-api.de":72,"pt.wikisource.org":720,
+  "services.arcgis.com":72,"opendata.porto.digital":168,"dadosabertos.cascais.pt":168};
+let _pc=null, _pcTimer=null;
+function _pcCarrega(){
+  if(_pc) return _pc;
+  try{ _pc=JSON.parse(localStorage.getItem("cv-cache")||"{}"); }catch(e){ _pc={}; }
+  return _pc;
+}
+function _pcGuarda(){
+  clearTimeout(_pcTimer);
+  _pcTimer=setTimeout(()=>{
+    try{
+      let ks=Object.keys(_pc), s=JSON.stringify(_pc);
+      while(s.length>1.2e6&&ks.length){            // despeja os mais antigos
+        ks.sort((a,b)=>_pc[a][0]-_pc[b][0]); delete _pc[ks.shift()]; s=JSON.stringify(_pc);
+      }
+      localStorage.setItem("cv-cache",s);
+    }catch(e){ _pc={}; try{localStorage.removeItem("cv-cache");}catch(_){} }
+  },1500);
+}
+function _pcLe(url,host){
+  const h=TTL_H[host]; if(!h) return undefined;
+  const e=_pcCarrega()[url];
+  if(e&&Date.now()-e[0]<h*3600e3){ e[0]=e[0]; return e[1]; }
+  return undefined;
+}
+function _pcPoe(url,host,v){
+  if(!TTL_H[host]||v==null) return;
+  const s=JSON.stringify(v); if(s.length>80000) return;
+  _pcCarrega()[url]=[Date.now(),v]; _pcGuarda();
+}
+const q3=x=>(+x).toFixed(3), q4=x=>(+x).toFixed(4);   // ~110 m / ~11 m: posições vizinhas partilham a cache
+/* prazo máximo para fontes opcionais: se demorar, segue sem ela — o pedido
+   continua em segundo plano e deixa a cache quente para o anúncio seguinte */
+const comPrazo=(p,ms,omissao=null)=>Promise.race([Promise.resolve(p).catch(()=>omissao),new Promise(r=>setTimeout(()=>r(omissao),ms))]);
 async function busca(url, tipo="json"){
   if(cache.has(url)) return cache.get(url);
-  const host=new URL(url).host, gap=RITMO[host]||120;
+  const host=new URL(url).host;
+  const guardado=_pcLe(url,host);
+  if(guardado!==undefined){ cache.set(url,guardado); return guardado; }
+  const gap=RITMO[host]||120;
   const desde=Date.now()-(_ult[host]||0);
   if(desde<gap) await espera(gap-desde);
   _ult[host]=Date.now();
@@ -513,13 +555,13 @@ async function busca(url, tipo="json"){
     const r=await fetch(url,{signal:AbortSignal.timeout(20000)});
     if(!r.ok) throw new Error(r.status);
     const v = tipo==="json" ? await r.json() : await r.text();
-    cache.set(url,v); return v;
+    cache.set(url,v); _pcPoe(url,host,v); return v;
   }catch(e){ console.warn("fonte falhou:",host,e.message); return null; }
 }
 const WIKI = l => `https://${l}.wikipedia.org/w/api.php?origin=*&format=json&formatversion=2&action=query&`;
 
 async function nominatim(lat,lon){
-  const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=14&addressdetails=1&accept-language=pt`);
+  const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${q3(lat)}&lon=${q3(lon)}&format=jsonv2&zoom=14&addressdetails=1&accept-language=pt`);
   const a=(d&&d.address)||{};
   const freg=a.suburb||a.village||a.town||a.city_district||a.parish;
   const conc=a.municipality||a.city||a.town||a.county;
@@ -533,7 +575,7 @@ async function geocodifica(nomeLugar){
   return r?{lat:+r.lat, lon:+r.lon, nome:r.display_name}:null;
 }
 async function wikiGeo(lat,lon,lang,raio){
-  const d=await busca(WIKI(lang)+`list=geosearch&gscoord=${lat}%7C${lon}&gsradius=${Math.min(raio,10000)}&gslimit=30`);
+  const d=await busca(WIKI(lang)+`list=geosearch&gscoord=${q3(lat)}%7C${q3(lon)}&gsradius=${Math.min(raio,10000)}&gslimit=30`);
   return (d&&d.query&&d.query.geosearch)||[];
 }
 
@@ -545,7 +587,7 @@ async function wikiGeo(lat,lon,lang,raio){
 async function tempoAgora(lat,lon){
   if(Date.now()-(S.ultimoTempo||0)<15*60e3) return null;   // uma vez a cada ~15 min
   try{
-    const d=await busca(`https://json.geoapi.pt/gps/${lat},${lon}`);
+    const d=await busca(`https://json.geoapi.pt/gps/${q3(lat)},${q3(lon)}`);
     if(!d||!d.clima) return null;
     S.ultimoTempo=Date.now();
     const c=d.clima;
@@ -766,7 +808,7 @@ async function wikidata(qids){
   return (d&&d.entities)||{};
 }
 async function overpass(lat,lon,raio=400){
-  const q=`[out:json][timeout:20];(node(around:${raio},${lat},${lon})["historic"];node(around:${raio},${lat},${lon})["tourism"~"^(attraction|museum|artwork|viewpoint|gallery)$"];);out tags 30;`;
+  const q=`[out:json][timeout:20];(node(around:${raio},${q3(lat)},${q3(lon)})["historic"];node(around:${raio},${q3(lat)},${q3(lon)})["tourism"~"^(attraction|museum|artwork|viewpoint|gallery)$"];);out tags 30;`;
   const d=await busca(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
   return (d&&d.elements)||[];
 }
@@ -1258,21 +1300,21 @@ async function canalHistoria(f){
   if(ehLisboa(f.local)&&f.lat!=null){
     try{
       const raio=(MODOS[f.modo]||MODOS.pe).raio;
-      for(const it of await patrimonioCML(f.lat,f.lon,raio))
+      for(const it of await comPrazo(patrimonioCML(f.lat,f.lon,raio),5000,[]))
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património CML:",e); }
   }
   if(ehPorto(f.local)&&f.lat!=null){
     try{
       const raio=(MODOS[f.modo]||MODOS.pe).raio;
-      for(const it of await patrimonioPorto(f.lat,f.lon,raio))
+      for(const it of await comPrazo(patrimonioPorto(f.lat,f.lon,raio),5000,[]))
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património Porto:",e); }
   }
   if(ehCascais(f.local)&&f.lat!=null){
     try{
       const raio=(MODOS[f.modo]||MODOS.pe).raio;
-      for(const it of await patrimonioCascais(f.lat,f.lon,raio))
+      for(const it of await comPrazo(patrimonioCascais(f.lat,f.lon,raio),5000,[]))
         if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
     }catch(e){ console.warn("património Cascais:",e); }
   }
@@ -1282,7 +1324,7 @@ async function canalHistoria(f){
     const novosAteAqui=fora.filter(x=>!S.ditos.has(x.chave)).length;
     if(novosAteAqui<2){
       try{
-        const volta=await olharEmVolta(f.latAtual,f.lonAtual,f.rumo,fora.map(x=>norm(x.chave)));
+        const volta=await comPrazo(olharEmVolta(f.latAtual,f.lonAtual,f.rumo,fora.map(x=>norm(x.chave))),6000,[]);
         for(const it of volta) if(!fora.some(x=>x.chave===it.chave)) fora.push(it);
       }catch(e){ console.warn("olhar em volta:",e); }
     }
@@ -1290,7 +1332,7 @@ async function canalHistoria(f){
   if(S.extra.gente){
     const qids=f.base.map(e=>e.qid).filter(Boolean).slice(0,2);
     if(qids.length){
-      const gente=await filhosDaTerra(qids);
+      const gente=(await comPrazo(filhosDaTerra(qids),5000,[]))||[];
       if(gente.length){
         const lista=gente.slice(0,3).map(p=>p.desc?`${p.nome}, ${p.desc}`:p.nome).join("; ");
         fora.push({chave:`gente:${qids[0]}`, texto:`Desta terra são naturais: ${lista}.`});
@@ -1302,7 +1344,7 @@ async function canalHistoria(f){
   if(S.extra.leitura){
     try{
       const nomes=[...new Set([f.local.freguesia,f.local.concelho,f.local.distrito].filter(Boolean))];
-      const lit=await wikisourceExcerto(nomes);
+      const lit=await comPrazo(wikisourceExcerto(nomes),6000);
       if(lit){
         const chave=`leitura:${lit.titulo}`;
         if(!fora.some(x=>x.chave===chave))
@@ -1312,7 +1354,7 @@ async function canalHistoria(f){
   }
   if(S.extra.sipa&&f.local.concelho){
     try{
-      const ficha=await sipaExcerto(f.local.concelho);
+      const ficha=await comPrazo(sipaExcerto(f.local.concelho),6000);
       if(ficha){
         const chave=`sipa:${ficha.titulo}`;
         if(!fora.some(x=>x.chave===chave))
@@ -1703,7 +1745,7 @@ async function pessoaPorNome(nome){
 /* a pé: o pormenor da rua e do bairro onde estás AGORA */
 async function detalheRua(lat,lon,local){
   if(!S.extra.rua) return null;
-  const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=17&addressdetails=1&accept-language=pt`);
+  const d=await busca(`https://nominatim.openstreetmap.org/reverse?lat=${q4(lat)}&lon=${q4(lon)}&format=jsonv2&zoom=17&addressdetails=1&accept-language=pt`);
   const a=(d&&d.address)||{};
   const rua=a.road, bairro=a.suburb||a.neighbourhood||a.quarter;
   if(!rua||rua===S.ultimaRua) return null;
@@ -2331,40 +2373,29 @@ async function anunciar(lat,lon){
       S.ultimoConcelho=local.concelho;
     }
     if(local.freguesia&&local.concelho) registaFreguesia(local.concelho,local.freguesia);
-    // 1.º os avisos (IPMA, incêndios) — segurança fala antes de tudo
-    for(const av of await avisosZona(f,lat,lon)){
+    // As fontes opcionais correm TODAS ao mesmo tempo, cada uma com prazo
+    // máximo: uma fonte lenta já não atrasa o anúncio inteiro (continua em
+    // segundo plano e deixa a cache quente para o seguinte). A ordem de fala
+    // mantém-se: segurança primeiro.
+    const aPe=ehAPe(modo);
+    const [avisos,tempo,fe,ef,rua,rota]=await Promise.all([
+      comPrazo(avisosZona(f,lat,lon),6000,[]),
+      comPrazo(tempoAgora(lat,lon),4000),
+      comPrazo(festasDoMes(f),5000),
+      comPrazo(efemeride(f),5000),
+      aPe?comPrazo(detalheRua(lat,lon,local),6000):null,
+      modo!=="carro"?comPrazo(percursoPerto(lat,lon),6000):null,
+    ]);
+    for(const av of avisos||[]){
       marcaDito(av.chave);
       const t=paraVoz(av.texto);
       regista("ACTUALIDADE","⚠️ "+t); diz(t,null);
     }
-    // tempo real e riscos por ponto exacto (geoapi.pt) — muda sempre,
-    // nunca fica repetitivo, e não precisa de canal nenhum activo
-    try{
-      const tempo=await tempoAgora(lat,lon);
-      if(tempo){ const t=paraVoz(tempo); regista("ACTUALIDADE","🌤 "+t); diz(t,null); }
-    }catch(e){ console.warn("tempo:",e); }
-    // sazonalidade e efemérides: o presente e o calendário desta terra
-    try{
-      const fe=await festasDoMes(f);
-      if(fe){ const t=paraVoz(fe.texto); regista("SABORES","🎉 "+t); diz(t,"SABORES"); }
-      const ef=await efemeride(f);
-      if(ef){ const t=paraVoz(ef.texto); regista("HISTORIA","📅 "+t); diz(t,"HISTORIA"); }
-    }catch(e){ console.warn("calendário:",e); }
-    // a pé, o pormenor da rua onde estás agora
-    if(ehAPe(modo)){
-      const r=await detalheRua(lat,lon,local);
-      if(r){ pre+=r.texto+" "; }
-    }
-    // percursos (PR/GR, ecopistas) — a pé, a correr ou de bicicleta
-    if(modo!=="carro"){
-      try{
-        const rota=await percursoPerto(lat,lon);
-        if(rota){
-          const t=paraVoz(rota.texto);
-          regista("HISTORIA","🥾 "+t); diz(t,"HISTORIA");
-        }
-      }catch(e){ console.warn("percurso:",e); }
-    }
+    if(tempo){ const t=paraVoz(tempo); regista("ACTUALIDADE","🌤 "+t); diz(t,null); }
+    if(fe){ const t=paraVoz(fe.texto); regista("SABORES","🎉 "+t); diz(t,"SABORES"); }
+    if(ef){ const t=paraVoz(ef.texto); regista("HISTORIA","📅 "+t); diz(t,"HISTORIA"); }
+    if(rua){ pre+=rua.texto+" "; }
+    if(rota){ const t=paraVoz(rota.texto); regista("HISTORIA","🥾 "+t); diz(t,"HISTORIA"); }
     // radar de raridades: um desvio ocupa o anúncio deste tick — nunca de
     // carro, e nunca ao mesmo tempo que a narração normal (fila de 1 na voz)
     let desvio=null;
