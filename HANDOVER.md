@@ -22,5 +22,12 @@ Decisões já tomadas:
 - Desenvolvimento numa **janela nova**, depois da avaliação do Opus (arquitectura) e do Haiku (contagens).
 Em curso a 24/10: Opus escreve `DESENHO-BASE-CONHECIMENTO.md`; Haiku escreve `saida/contagens_lisboa.md` (pasta `saida/` não vai para o git — copiar para `projecto/dados/` quando pronto).
 
+## Decisões acrescentadas a 24/10 (pipeline de conhecimento)
+- Desenho do Opus em `DESENHO-BASE-CONHECIMENTO.md` (lido e aceite; relações OSM Lumiar 6384124 / Benfica 6385130 confirmadas; toponímia CML = dataset aberto **CC0** em dados.gov.pt). Esqueleto do marco 1 = toponímia CML (Lumiar 253, Benfica 182 topónimos), não a Wikipédia (pobre nestas freguesias). O Opus foi retomado para acrescentar a etapa de entrevista — **reler o ficheiro** para ver se já lá está.
+- Entrevista entre modelos: Haiku-entrevista-Haiku só vale como auto-consistência (5 tentativas, ficam as estáveis); concordância entre o mesmo modelo NÃO prova nada. Sonnet valida **contra texto de fonte** (a frase sustenta a afirmação? cita-a), nunca de memória. Opus audita 100 factos por marco. Locais (Ollama) = segunda voz independente, só com OK do João e VRAM livre medida.
+- **Primeira tarefa da construção = piloto medível**: ~20 entidades de Lumiar/Benfica com verdade conhecida; comparar Haiku sozinho vs Haiku+Sonnet validador vs consenso entre modelos diferentes; decidir por taxa de acerto.
+- Decisões do João ainda abertas (recomendações no desenho): base pública sob ODbL+CC BY-SA; editor do marco 1 = Haiku (~0,60 $); texto web só depois de verificado; exportação manual de `M` com lembrete mensal.
+- Contagens do Haiku: `saida/contagens_lisboa.md` ainda não entregue a 24/10 (Overpass 429); o Opus mediu os números do desenho por conta própria, por isso não bloqueia.
+
 ## Como começar a próxima janela
 Ler este ficheiro e `DESENHO-BASE-CONHECIMENTO.md`; não ler `projecto/` salvo necessidade. Decidir com o João as "Decisões que só ele pode tomar" do desenho antes de construir.
