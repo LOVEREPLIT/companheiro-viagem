@@ -1,0 +1,641 @@
+[
+ {
+  "top_id": 2657,
+  "faceta": "nome",
+  "gancho": "Um nome de palco que chegou à rua em 1983.",
+  "texto": "Renato Ramos Paulino escolheu o nome artístico de Paulo Renato e foi uma figura relevante do teatro português, como intérprete e encenador. O topónimo foi atribuído pelo Edital municipal de 11/11/1983, quase dois anos após a sua morte.",
+  "ancoras": [
+   1,
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 2657,
+  "faceta": "gente",
+  "gancho": "Nos anos 50 e 60 era o galã do momento.",
+  "texto": "Nas décadas de 50 e 60 a sua popularidade era enorme, e era o galã do momento. Foi contratado por Vasco Morgado em 1952 e contracenou com Laura Alves.",
+  "ancoras": [
+   7,
+   8
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 2657,
+  "faceta": "curiosidade",
+  "gancho": "Também passou pelo cinema e pela escrita.",
+  "texto": "No cinema criou personagens interessantes em Verdes Anos (1963), Sol e Touros (1949), Quando o Mar Galgou a Terra (1954) e Sangue Toureiro (1958). Em 1955 escreveu, com Costa Ferreira, duas peças infantis.",
+  "ancoras": [
+   12,
+   15
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4524,
+  "faceta": "nome",
+  "gancho": "Um homem que se fez por si e subiu a pulso.",
+  "texto": "José Simões era autodidata e antigo operário têxtil, com temperamento de industrial. Fundou a empresa com os cunhados Francisco Rodrigues e Adelino Rodrigues Figueiredo, com uma máquina de costura, na Ponte Velha em Palma de Baixo.",
+  "ancoras": [
+   3,
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4524,
+  "faceta": "gente",
+  "gancho": "A fábrica tinha creche e refeitório.",
+  "texto": "Desde cedo, José Simões deu apoio social aos trabalhadores e associou à fábrica uma creche e um refeitório. Na creche davam banho às crianças todos os dias e, no Natal, cada criança recebia um presente.",
+  "ancoras": [
+   6,
+   7
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4524,
+  "faceta": "antes",
+  "gancho": "Chegou a ter mais de 1500 trabalhadores.",
+  "texto": "A empresa introduziu em Portugal tecnologia importada inovadora e criou e fabricou máquinas para a produção têxtil. Teve um papel importante na fixação de pessoas e serviços em Benfica a partir da década de 1920.",
+  "ancoras": [
+   9
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4195,
+  "faceta": "nome",
+  "gancho": "Um engenheiro que conheceu bem o subsolo de Lisboa.",
+  "texto": "José Sidónio Brazão Farinha, nascido na Madeira, foi engenheiro geólogo ligado ao Metropolitano de Lisboa. Dedicou-se aos estudos sobre o subsolo lisboeta e deixou uma vasta obra.",
+  "ancoras": [
+   0,
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4195,
+  "faceta": "gente",
+  "gancho": "Passou 41 anos no Metro.",
+  "texto": "Durante 41 anos desempenhou funções no Metropolitano de Lisboa. Esteve intimamente ligado ao seu arranque e à instalação dos primeiros 19,5 km de linhas.",
+  "ancoras": [
+   5
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4195,
+  "faceta": "curiosidade",
+  "gancho": "Antes do Metro, trabalhou na água e no saneamento.",
+  "texto": "Formou-se como engenheiro em 1944 no Instituto Superior Técnico. Começou na Direção-Geral dos Serviços Hidráulicos, em trabalhos de pesquisa de tratamento de água e saneamento.",
+  "ancoras": [
+   4
+  ],
+  "auto": [
+   "nome:Direção",
+   "nome:Metro"
+  ]
+ },
+ {
+  "top_id": 4197,
+  "faceta": "nome",
+  "gancho": "Um investigador que escreveu sobre pintura antiga.",
+  "texto": "Armando Vieira Santos, nascido em 1903, distinguiu-se como investigador e ensaísta de História de Arte. Escreveu diversos livros, entre eles Primitivos portugueses do Museu de Setúbal e Os painéis de São Vicente de Fora.",
+  "ancoras": [
+   3,
+   5
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4197,
+  "faceta": "gente",
+  "gancho": "Esteve entre os fundadores de uma cooperativa de gravadores.",
+  "texto": "Em 20 de julho de 1956 integrou o grupo fundador da Cooperativa dos Gravadores Portugueses «A Gravura». Entre os colegas estavam os artistas Júlio Pomar e Rogério Ribeiro.",
+  "ancoras": [
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4197,
+  "faceta": "curiosidade",
+  "gancho": "Também participou numa obra de referência.",
+  "texto": "Participou no «Dicionário da pintura Universal - Pintura Portuguesa», de 1973.",
+  "ancoras": [
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3335,
+  "faceta": "nome",
+  "gancho": "Uma das primeiras mulheres jornalistas profissionais.",
+  "texto": "Maria da Conceição Vassalo e Silva da Cunha Lamas nasceu em Torres Novas, a 6 de outubro de 1893. Foi escritora e jornalista e usou também o pseudónimo Rosa Silvestre.",
+  "ancoras": [
+   3,
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3335,
+  "faceta": "gente",
+  "gancho": "Começou na Agência Americana de Notícias.",
+  "texto": "Foi uma das primeiras mulheres jornalistas profissionais. Iniciou-se na Agência Americana de Notícias pela mão da jornalista Virgínia Quaresma e dirigiu as páginas infantis dos diários A Voz e Correio da Manhã.",
+  "ancoras": [
+   7
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3335,
+  "faceta": "curiosidade",
+  "gancho": "Esteve três vezes exilada em Paris.",
+  "texto": "Foi eleita para o Conselho Mundial da Paz, em 1954. Isso lhe valeu, por três vezes, o exílio em Paris, onde apoiou emigrantes e exilados políticos.",
+  "ancoras": [
+   8
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 742,
+  "faceta": "nome",
+  "gancho": "Um nome que chegou à cidade por sugestão do Rotary.",
+  "texto": "O nome de Calouste Gulbenkian chegou à toponímia de Lisboa por sugestão do Rotary Clube de Lisboa. Foi num arruamento próximo da Fundação que ele mandou instituir.",
+  "ancoras": [
+   1
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 742,
+  "faceta": "gente",
+  "gancho": "Um colecionador de arte que ficou em Lisboa até à morte.",
+  "texto": "Calouste Gulbenkian era por gosto um colecionador de arte e acolheu-se em Portugal em 1942. Ficou até à morte, a morar no Hotel Aviz, em Lisboa.",
+  "ancoras": [
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 742,
+  "faceta": "curiosidade",
+  "gancho": "Foi conhecido como o Senhor cinco por cento.",
+  "texto": "Na Turkish Petroleum Company ficou conhecido como «Senhor cinco por cento». Era um magnata da indústria petrolífera e naturalizou-se inglês em 1902.",
+  "ancoras": [
+   4,
+   5
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4390,
+  "faceta": "nome",
+  "gancho": "O Pantera Negra, a Pérola Negra, o Rei.",
+  "texto": "Eusébio da Silva Ferreira, nascido em Moçambique, foi um dos melhores jogadores de futebol de todos os tempos. Tinha muitos nomes: o Pantera Negra, a Pérola Negra e o Rei.",
+  "ancoras": [
+   1
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4390,
+  "faceta": "gente",
+  "gancho": "Foi o maior marcador de sempre do Benfica.",
+  "texto": "Jogou 15 dos seus 22 anos como atleta do Sport Lisboa e Benfica. Foi o melhor marcador de sempre da equipa, com 638 golos em 641 partidas oficiais.",
+  "ancoras": [
+   5,
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 4390,
+  "faceta": "curiosidade",
+  "gancho": "Uma estátua de bronze junto ao Estádio da Luz.",
+  "texto": "Desde 1992 há uma estátua de bronze em frente ao Estádio da Luz. A iniciativa foi de Vítor Baptista, adepto benfiquista e emigrante nos Estados Unidos.",
+  "ancoras": [
+   13,
+   14
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3503,
+  "faceta": "nome",
+  "gancho": "Uma figura marcante do século XX português.",
+  "texto": "Álvaro Barreirinhas Cunhal, nascido em Coimbra, foi uma das figuras mais marcantes do século XX português. Foi eleito secretário-geral do Partido Comunista Português em março de 1961.",
+  "ancoras": [
+   1,
+   2
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3503,
+  "faceta": "gente",
+  "gancho": "Foi ministro sem pasta depois do 25 de Abril.",
+  "texto": "Depois do 25 de Abril de 1974 foi ministro sem pasta nos primeiros Governos Provisórios. Foi também eleito deputado à Assembleia Constituinte, em 1975.",
+  "ancoras": [
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3503,
+  "faceta": "curiosidade",
+  "gancho": "Tinha também um lado de escritor e tradutor.",
+  "texto": "Sob o pseudónimo Manuel Tiago publicou, entre outras obras, «Até Amanhã, Camaradas». Também traduziu «Rei Lear», de Shakespeare.",
+  "ancoras": [
+   8,
+   9
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 684,
+  "faceta": "nome",
+  "gancho": "Pintor, desenhador e professor de Medicina.",
+  "texto": "Abel de Lima Salazar nasceu em Guimarães em 1889 e morreu em Lisboa em 1946. Foi pintor e professor universitário, e ficou conhecido como desenhador, caricaturista, gravador e escultor.",
+  "ancoras": [
+   4,
+   10
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 684,
+  "faceta": "antes",
+  "gancho": "Doutorou-se no Porto com um ensaio de filosofia.",
+  "texto": "Doutorou-se em 1915 na Faculdade de Medicina do Porto, com um ensaio sobre Psicologia Filosófica. Depois foi professor catedrático da cadeira de Histologia e Embriologia da Universidade do Porto, a partir de 1919.",
+  "ancoras": [
+   5,
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 684,
+  "faceta": "gente",
+  "gancho": "Foi afastado da Universidade por motivos políticos.",
+  "texto": "Em 1935, perseguido por motivos políticos, foi demitido compulsivamente da Universidade. Foi reintegrado em 1941.",
+  "ancoras": [
+   7
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 463,
+  "faceta": "nome",
+  "gancho": "Um ciclista que foi glória do Sporting.",
+  "texto": "Alfredo Trindade, nascido no Cartaxo, foi uma conhecida glória do Sporting Clube de Portugal. A rua defronte do Estádio de Alvalade tem o seu nome desde o Edital de 4 de fevereiro de 1993.",
+  "ancoras": [
+   1,
+   2,
+   3,
+   5
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 463,
+  "faceta": "curiosidade",
+  "gancho": "Ganhou a Volta a Portugal ao serviço de um clube do Bairro Alto.",
+  "texto": "Em 1931 ficou em 2.º lugar na Volta a Portugal, logo atrás de Nicolau. No ano seguinte ganhou a prova ao serviço da União Ciclista Rio de Janeiro, coletividade do Bairro Alto.",
+  "ancoras": [
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 463,
+  "faceta": "gente",
+  "gancho": "Um rival que era amigo pessoal.",
+  "texto": "Era amigo pessoal do benfiquista José Maria Nicolau, apesar de rival nas competições. Nicolau tinha já uma rua perto do Estádio da Luz desde 9 de junho de 1992.",
+  "ancoras": [
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 2777,
+  "faceta": "nome",
+  "gancho": "Uma alameda para os Raios X.",
+  "texto": "No centenário da descoberta dos Raios X, a Câmara Municipal de Lisboa deu o nome de Roentgen a uma alameda central. Foi pelo Edital Municipal de 6 de abril de 1995, na Quinta dos Inglesinhos.",
+  "ancoras": [
+   1
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 2777,
+  "faceta": "curiosidade",
+  "gancho": "Deu o nome de raios-X a algo ainda desconhecido.",
+  "texto": "Em 1895 descobriu os Raios X durante experiências com raios catódicos. Hoje é considerado o pai da Radiologia de Diagnóstico médico.",
+  "ancoras": [
+   2,
+   5
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 2777,
+  "faceta": "gente",
+  "gancho": "Doou o dinheiro do Prémio Nobel.",
+  "texto": "Doou o dinheiro do Prémio Nobel à sua universidade. Rejeitou registar qualquer patente relacionada com a sua descoberta, porque achava que a ciência devia estar ao serviço da humanidade e não do lucro.",
+  "ancoras": [
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 462,
+  "faceta": "nome",
+  "gancho": "Um médico que preferiu ser jornalista.",
+  "texto": "Hermano Neves formou-se em Medicina pela Universidade de Berlim, mas escolheu o jornalismo. Dá nome a uma rua de Lisboa desde 1981, antes conhecida como Rua Vinte e Quatro de Telheiras-Sul.",
+  "ancoras": [
+   1,
+   2
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 462,
+  "faceta": "gente",
+  "gancho": "Fundou um jornal que virou escola.",
+  "texto": "Em 1919 foi co-fundador e diretor de A Vitória, título simbólico da vitória de Aliados e Republicanos. Ele transformou-o numa escola de jornalismo.",
+  "ancoras": [
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 462,
+  "faceta": "curiosidade",
+  "gancho": "Foi repórter a partir da frente de batalha.",
+  "texto": "Foi pioneiro em reportagens de cariz moderno. Fez, por exemplo, reportagens sobre a I Guerra a partir dos campos de batalha em França, entre 1914 e 1918.",
+  "ancoras": [
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 74,
+  "faceta": "nome",
+  "gancho": "Dezoito anos depois da morte, entrou na toponímia.",
+  "texto": "Ladislau Patrício foi médico, professor, escritor e republicano. Dezoito anos após a sua morte, a partir de uma sugestão do filho João Patrício, o seu nome entrou na toponímia de Lisboa.",
+  "ancoras": [
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 74,
+  "faceta": "gente",
+  "gancho": "Tratou militares com tuberculose.",
+  "texto": "Dirigiu o Sanatório Militar de São Fiel, entre 1917 e 1919, onde coordenou o tratamento dos militares do Corpo Expedicionário Português que voltavam tuberculosos. Em 1934 foi nomeado diretor do Sanatório Sousa Martins, cargo que exerceu até 1953.",
+  "ancoras": [
+   1,
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 74,
+  "faceta": "curiosidade",
+  "gancho": "Também ajudou a impulsionar a rádio.",
+  "texto": "A partir de finais da década de quarenta foi um notável impulsionador da radiodifusão. Terá sido o autor do primeiro regulamento da Rádio Altitude, de 1947, que funcionava no Sanatório Sousa Martins.",
+  "ancoras": [
+   9
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3289,
+  "faceta": "nome",
+  "gancho": "Um médico que também foi escritor.",
+  "texto": "A CML homenageou Fernando Namora com edital de 17/07/1990. Fernando Gonçalves Namora nasceu em Condeixa, a 15 de abril de 1919, e faleceu em Lisboa em 1989. Foi um médico que se construiu também como escritor.",
+  "ancoras": [
+   1,
+   2,
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3289,
+  "faceta": "gente",
+  "gancho": "Chegou a ser proposto para o Nobel.",
+  "texto": "Em 1981 foi proposto para o Prémio Nobel da Literatura, pela Academia das Ciências de Lisboa e pelo PEN Clube. Foi também condecorado com a Medalha de Ouro da Societé d'Encouragement au Progrés, em 1979.",
+  "ancoras": [
+   16,
+   17
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3289,
+  "faceta": "curiosidade",
+  "gancho": "Um dos seus livros chegou ao Festival de Berlim.",
+  "texto": "Retalhos da Vida de um Médico, filme de Jorge Brum do Canto (1962), foi selecionado para o Festival de Berlim.",
+  "ancoras": [
+   10
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 247,
+  "faceta": "nome",
+  "gancho": "Um diplomata que deu milhares de vistos.",
+  "texto": "Aristides de Sousa Mendes, natural de Cabanas de Viriato, foi diplomata. Em 1938 foi nomeado cônsul em Bordéus, França, onde concedeu cerca de 30 000 vistos que permitiram que milhares de pessoas alcançassem Portugal.",
+  "ancoras": [
+   4,
+   6,
+   14
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 247,
+  "faceta": "gente",
+  "gancho": "Passou a ser um Justo entre as Nações.",
+  "texto": "Desde 1966 é considerado um Justo entre as Nações, a par com outros três portugueses. Este conceito honra os não judeus que se arriscaram a salvar judeus do Holocausto.",
+  "ancoras": [
+   21
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 247,
+  "faceta": "antes",
+  "gancho": "Ficou anos sem ser reabilitado.",
+  "texto": "Até à sua morte, em 1954, nunca foi reabilitado e a sua ação era desconhecida por quase todos. A partir de 1974, o seu papel e legado foram reconhecidos em Portugal e por todo o Mundo.",
+  "ancoras": [
+   18,
+   22
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3281,
+  "faceta": "nome",
+  "gancho": "Um poeta com uma rua que andou às voltas.",
+  "texto": "Bocage é considerado o maior poeta português do século XVIII. Publicou apenas os três volumes das suas Rimas, de 1791 a 1804.",
+  "ancoras": [
+   7,
+   8,
+   9
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3281,
+  "faceta": "gente",
+  "gancho": "Viveu fora antes de voltar a Lisboa.",
+  "texto": "Manuel Maria Barbosa du Bocage viveu em Goa, Damão e Macau, até regressar a Lisboa em 1790. A partir de 1801 morou na Travessa André Valente, ao Bairro Alto.",
+  "ancoras": [
+   6
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3281,
+  "faceta": "curiosidade",
+  "gancho": "Foi preso por ordem do Intendente Pina Manique.",
+  "texto": "Em 7 de agosto de 1797 foi preso por desrespeito ao rei e à Igreja. Esteve no Limoeiro, nos calabouços da Inquisição e no Real Hospício das Necessidades.",
+  "ancoras": [
+   12
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 1191,
+  "faceta": "nome",
+  "gancho": "Recebeu o nome de uma rua pouco depois da morte.",
+  "texto": "Cipriano Dourado foi um artista plástico que se dedicou à gravura, ao desenho, à ilustração, à pintura e à aguarela. A rua recebeu o seu nome por edital de 4 de dezembro de 1981, pouco mais de um mês após o falecimento.",
+  "ancoras": [
+   1,
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 1191,
+  "faceta": "curiosidade",
+  "gancho": "Viajou pelos arrozais para uma obra.",
+  "texto": "Em 1953 participou numa experiência conhecida como Ciclo de Arroz, percorrendo os campos de arrozais do Ribatejo. Inspirou-se nessa viagem para as suas litografias «Plantadoras de Arroz».",
+  "ancoras": [
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 1191,
+  "faceta": "gente",
+  "gancho": "Foi um dos fundadores de uma cooperativa de gravadores.",
+  "texto": "Em 1956 foi membro fundador da Gravura, Sociedade Cooperativa de Gravadores. Também foi professor da Escola de Artes Decorativas António Arroio.",
+  "ancoras": [
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 1491,
+  "faceta": "nome",
+  "gancho": "Uma cantadeira de Ovar com rua em Lisboa.",
+  "texto": "Maria Albertina Soares de Paiva, nascida em Ovar, viveu grande parte da vida em Lisboa. A rua recebeu o seu nome pelo Edital de 25 de junho de 1985, cerca de três meses após o falecimento.",
+  "ancoras": [
+   1,
+   2,
+   5
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 1491,
+  "faceta": "curiosidade",
+  "gancho": "Um bairro só tinha ruas com Maria.",
+  "texto": "O Bairro Municipal da Cruz Vermelha era conhecido popularmente como o Bairro das Marias. Contava só com topónimos com Maria, como a Rua das Duas Marias e a Rua das Cinco Marias.",
+  "ancoras": [
+   3
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 1491,
+  "faceta": "gente",
+  "gancho": "Estreou-se numa opereta e ganhou um prémio logo no ano seguinte.",
+  "texto": "Estreou-se como cantadeira em Lisboa, em 1931, no Teatro Maria Vitória, na opereta História do Fado. No ano seguinte ganhou em julho o prémio Guitarra de Ouro.",
+  "ancoras": [
+   6,
+   7
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3362,
+  "faceta": "nome",
+  "gancho": "Um compositor com uma canção sobre Alcobaça.",
+  "texto": "José Ramos Belo Costa Marques du Boutac foi compositor, orquestrador e figura relevante da Emissora Nacional. A rua tem o seu nome desde o Edital de 15 de dezembro de 2003 e integra o Bairro da Música do Alto do Lumiar.",
+  "ancoras": [
+   1,
+   2
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3362,
+  "faceta": "curiosidade",
+  "gancho": "Escreveu mais de setecentas canções.",
+  "texto": "Escreveu mais de 700 canções onde enalteceu cenários portugueses como o Vale do Vouga, o Alcoa, Leiria ou Alcobaça. Também dedicou a Lisboa temas como Campanários de Lisboa e Miradouros de Lisboa.",
+  "ancoras": [
+   3,
+   4
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 3362,
+  "faceta": "gente",
+  "gancho": "Ajudou a lançar grandes nomes da rádio.",
+  "texto": "Criou na Emissora Nacional o Centro de Preparação de Artistas, para lançar novas estrelas da rádio. Foram exemplo Francisco José, Júlia Barroso, Madalena Iglésias, Simone de Oliveira ou Tony de Matos.",
+  "ancoras": [
+   16
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 808,
+  "faceta": "nome",
+  "gancho": "Uma avenida inaugurada no Dia Internacional da Mulher.",
+  "texto": "A Avenida Maria Helena Vieira da Silva foi inaugurada no Dia Internacional da Mulher de 1993, no Lumiar. A pintora é considerada um expoente maior da pintura contemporânea, com as suas originais geometrias.",
+  "ancoras": [
+   1
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 808,
+  "faceta": "gente",
+  "gancho": "Preferiu a pintura à música.",
+  "texto": "Maria Helena Vieira da Silva nasceu em Lisboa em 1908 e, apesar das aulas de música, preferiu a pintura. Em 1930 casou com o pintor húngaro Arpad Szénes.",
+  "ancoras": [
+   4,
+   10
+  ],
+  "auto": []
+ },
+ {
+  "top_id": 808,
+  "faceta": "curiosidade",
+  "gancho": "Tem uma fundação numa antiga fábrica.",
+  "texto": "A Fundação Arpad Szènes-Vieira da Silva abriu ao público em 3 de novembro de 1994. Fica na antiga Fábrica das Sedas da Praça das Amoreiras.",
+  "ancoras": [
+   17
+  ],
+  "auto": []
+ }
+]

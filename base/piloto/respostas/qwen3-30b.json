@@ -1,0 +1,162 @@
+[
+ {
+  "profissao": "médico",
+  "nascimento": 1908,
+  "morto": 1988,
+  "ano_atribuicao": 2004,
+  "facto": "Foi um dos pioneiros da medicina preventiva em Portugal.",
+  "top_id": 2657
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1880,
+  "morte": 1960,
+  "ano_atribuicao": 1960,
+  "facto": "Foi um dos principais engenheiros responsáveis pela construção da linha de comboio do Norte em Portugal.",
+  "top_id": 4524
+ },
+ {
+  "profissao": "médico",
+  "nascimento": 1865,
+  "morte": 1938,
+  "ano_atribuicao": 1940,
+  "facto": "Foi um dos fundadores da Sociedade de Estudos de Benfica e destacou-se na medicina e na vida cultural da cidade.",
+  "top_id": 4195
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1920,
+  "mortes": 2005,
+  "ano_atribuicao": 2008,
+  "facto": "Foi um dos principais engenheiros responsáveis pelo projeto da barragem de Alqueva.",
+  "top_id": 4197
+ },
+ {
+  "profissao": "escritora",
+  "nascimento": 1911,
+  "morte": 2004,
+  "ano_atribuicao": 2018,
+  "facto": "Foi uma das primeiras mulheres a publicar um romance em Portugal com temática feminista, em 1944.",
+  "top_id": 3335
+ },
+ {
+  "profissao": "industrial",
+  "nascimento": 1869,
+  "morte": 1955,
+  "ano_atribuicao": 1999,
+  "facto": "Foi um magnata do petróleo e filantropo que fundou a Fundação Calouste Gulbenkian.",
+  "top_id": 742
+ },
+ {
+  "profissao": "futebolista",
+  "nascimento": 1942,
+  "morte": 2014,
+  "ano_atribuicao": 2015,
+  "facto": "Foi um dos maiores jogadores da história do Sport Lisboa e Benfica, conquistando múltiplos títulos nacionais e internacionais.",
+  "top_id": 4390
+ },
+ {
+  "profissao": "político",
+  "nascimento": 1929,
+  "morte": 2021,
+  "ano_atribuicao": 2022,
+  "facto": "Foi um dos líderes do Partido Comunista Português e presidiu ao partido durante mais de 40 anos.",
+  "top_id": 3503
+ },
+ {
+  "profissao": "médico",
+  "nascimento": 1889,
+  "morte": 1950,
+  "ano_atribuicao": 2004,
+  "facto": "Foi um dos pioneiros da medicina portuguesa no campo da neurologia e da psiquiatria.",
+  "top_id": 684
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1880,
+  "morte": 1960,
+  "ano_atribuicao": 1998,
+  "facto": "Foi um dos principais engenheiros responsáveis pelo desenvolvimento da rede de transporte público de Lisboa no século XX.",
+  "top_id": 463
+ },
+ {
+  "profissao": "físico",
+  "nascimento": 1845,
+  "morte": 1923,
+  "ano_atribuicao": 2004,
+  "facto": "Descobriu os raios X em 1895, o que revolucionou a medicina e a física.",
+  "top_id": 2777
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1880,
+  "morte": 1960,
+  "ano_atribuicao": 1958,
+  "facto": "Foi um dos principais engenheiros responsáveis pela construção da linha de comboio do Norte em Portugal.",
+  "top_id": 462
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1885,
+  "morto": 1965,
+  "ano_atribuicao": 1998,
+  "facto": "Foi um dos principais engenheiros responsáveis pelo desenvolvimento da rede de abastecimento de água de Lisboa no século XX.",
+  "top_id": 74
+ },
+ {
+  "profissao": "escritor",
+  "nascimento": 1904,
+  "morte": 1985,
+  "ano_atribuicao": 2004,
+  "facto": "Foi um dos principais autores da literatura portuguesa do século XX, conhecido por obras como 'O Livro do Tempo'.",
+  "top_id": 3289
+ },
+ {
+  "profissao": "diplomata",
+  "nascimento": 1885,
+  "morte": 1967,
+  "ano_atribuicao": 2008,
+  "facto": "Atribuiu vistos a milhares de refugiados judeus durante a Segunda Guerra Mundial, apesar das ordens do governo português.",
+  "top_id": 247
+ },
+ {
+  "profissao": "poeta",
+  "nascimento": 1781,
+  "morte": 1800,
+  "ano_atribuicao": 1936,
+  "facto": "Foi um dos principais representantes da poesia romântica portuguesa, apesar de ter falecido com apenas 19 anos.",
+  "top_id": 3281
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1850,
+  "morte": 1925,
+  "ano_atribuicao": 1936,
+  "facto": "Foi um dos principais engenheiros responsáveis pela construção da linha de comboio do Norte em Portugal.",
+  "top_id": 1191
+ },
+ {
+  "profissao": "escritora",
+  "nascimento": 1910,
+  "morto": 2000,
+  "ano_atribuicao": 2005,
+  "facto": "Foi uma das primeiras mulheres a publicar um romance em Portugal com temática feminista.",
+  "top_id": 1491
+ },
+ {
+  "profissao": "engenheiro",
+  "nascimento": 1840,
+  "morte": 1910,
+  "ano_atribuicao": 1936,
+  "facto": "Foi um dos principais engenheiros responsáveis pela construção da linha de comboio entre Lisboa e Sintra no século XIX.",
+  "top_id": 3362
+ },
+ {
+  "profissao": "Pintora",
+  "nascimento": 1908,
+  "morte": 2018,
+  "ano_atribuicao": 2018,
+  "facto": "Foi a primeira mulher a ter uma exposição individual no Museu de Arte Moderna de Nova Iorque.",
+  "top_id": 808
+ }
+]

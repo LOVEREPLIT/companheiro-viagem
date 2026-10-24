@@ -27,7 +27,18 @@ Em curso a 24/10: Opus escreve `DESENHO-BASE-CONHECIMENTO.md`; Haiku escreve `sa
 - Entrevista entre modelos: Haiku-entrevista-Haiku só vale como auto-consistência (5 tentativas, ficam as estáveis); concordância entre o mesmo modelo NÃO prova nada. Sonnet valida **contra texto de fonte** (a frase sustenta a afirmação? cita-a), nunca de memória. Opus audita 100 factos por marco. Locais (Ollama) = segunda voz independente, só com OK do João e VRAM livre medida.
 - **Primeira tarefa da construção = piloto medível**: ~20 entidades de Lumiar/Benfica com verdade conhecida; comparar Haiku sozinho vs Haiku+Sonnet validador vs consenso entre modelos diferentes; decidir por taxa de acerto.
 - Decisões do João ainda abertas (recomendações no desenho): base pública sob ODbL+CC BY-SA; editor do marco 1 = Haiku (~0,60 $); texto web só depois de verificado; exportação manual de `M` com lembrete mensal.
-- Contagens do Haiku: `saida/contagens_lisboa.md` ainda não entregue a 24/10 (Overpass 429); o Opus mediu os números do desenho por conta própria, por isso não bloqueia.
+- Contagens do Haiku entregues e guardadas em `projecto/dados/contagens_lisboa.md`: batem com as do Opus (Wikidata Lisboa 2 167 entidades, 899 com artigo PT; OSM wikidata 2 028; Lumiar 46 e Benfica 28 entidades no Wikidata). Diferença só de unidade (5 213 segmentos de via com etimologia vs 911 nomes únicos). Novo facto: **"Lojas com História" NÃO existe como dataset aberto** em dados.gov.pt (0 resultados) — riscar do desenho como candidata. Linhas Overpass de Lumiar/Benfica ficaram por medir (usar as do desenho).
+
+## Decisões do João (24/10, respondidas)
+1. Base **pública** (ODbL + CC BY-SA, ecrã «Fontes»). 2. Locais Ollama **autorizados** com portão de VRAM; Haiku editor do marco 1. 3. Texto web da lista branca **só depois de verificado**. 4. **Backup de M automático**, com pop-up de autorização que diz o que vai ser guardado, e o João dá OK (não exportação manual). Nota técnica: app estática não escreve no OneDrive sozinha; desenho proposto = agendar sozinho (semanal/mensal), mostrar o pop-up «Guardar cópia de segurança? (N ditos, sem localização)» e, no OK, `showSaveFilePicker`/Web Share/download para uma pasta do OneDrive; confirmar com o João o mecanismo exacto antes de implementar (F2).
+
+## Piloto F1.0 FEITO (24/10) — ver `base/piloto/RELATORIO.md`
+- Entrevista de memória: hiperlocais → Haiku/Sonnet 0 % de cobertura, Opus 10 %, qwen3:30b inventa (88 % erro confiante). Critério não cumprido → modo «descobrir lacunas»; entrevista nunca cria factos. gemma4/gpt-oss não corridos (VRAM 3,5 GB livres; não alteram a decisão).
+- Editor Haiku sobre texto CML: 58/60 ok, 2 distorções, 0 invenções; checks automáticos e Sonnet validador apanharam 0 das 2 distorções; só o Opus as apanhou. Decisão: Haiku editor + checks automáticos + auditoria Opus; sem validador Sonnet. Regra para o brief do editor: preservar ressalvas («pode ser considerado») e não trocar obra adaptada por obra original.
+- Feito também: `base/c0_cml_toponimia.py` e `base/bruto/cml/toponimia-{lumiar,benfica}-2026-10-24.json.gz` (253 + 182, bate com o desenho). Pasta `base/` ainda não commitada.
+
+## Próximo passo (por ordem)
+C0 restante (OSM por Overpass relações 6384124/6385130 a 15 s entre pedidos, património CML camadas 11+12, Wikidata, Wikipédia geosearch) → C1 fusão → C2 Haiku editor (lotes de 10, âncoras = números de frases, checks de `p4_checks.py`) → C3 auditoria Opus de 100 factos → tiles geohash-6 + `baseAqui` no `docs/index.html` → testes F1 em http://127.0.0.1:8124/ → publicar. Depois F2 (escrita de volta + backup com pop-up).
 
 ## Como começar a próxima janela
 Ler este ficheiro e `DESENHO-BASE-CONHECIMENTO.md`; não ler `projecto/` salvo necessidade. Decidir com o João as "Decisões que só ele pode tomar" do desenho antes de construir.
