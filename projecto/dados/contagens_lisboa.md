@@ -26,12 +26,27 @@ Medido em 24/10/2026 com pedidos reais (Overpass, Wikidata SPARQL, dados.gov.pt)
 | B5 variante simplificada: igrejas (P131 direto, com coordenadas) | 11 | `SELECT (COUNT(DISTINCT ?item) AS ?n) WHERE { ?item wdt:P131 wd:Q597 ; wdt:P625 ?c ; wdt:P31/wdt:P279* wd:Q16970 . }` | (sem exemplo) | MEDIDO (simplificada) |
 | C1 dados.gov.pt: "toponimia lisboa" | 1 dataset | `https://dados.gov.pt/api/1/datasets/?q=lisboa%20toponimia&page_size=5` | Toponímia de Lisboa, org. Município de Lisboa, recurso ArcGIS FeatureServer (Cultura_Toponimia) | MEDIDO |
 | C2 dados.gov.pt: "lojas com historia" | 0 datasets | `https://dados.gov.pt/api/1/datasets/?q=lojas%20com%20historia&page_size=5` | (sem resultados) | MEDIDO: "Lojas com História" NÃO existe como dataset aberto na pesquisa |
-| D1 Lumiar (freguesia, admin_level 8): vias, nwr, Overpass A1-A10 | NÃO MEDIDO (em curso) | área `rel(area.a)["name"="Lumiar"]["admin_level"="8"];map_to_area` | - | EM CURSO: rerun com admin_level 8 ainda sem terminar |
 | D2 Lumiar, Wikidata: entidades da freguesia (P131*, Q924723) com coordenadas | 46 | `SELECT (COUNT(DISTINCT ?item) AS ?n) WHERE { ?item wdt:P131* wd:Q924723 ; wdt:P625 ?c . }` | (ver lb_results) | MEDIDO |
 | D3 Lumiar, Wikidata: dessas com artigo PT | 28 | idem + `?art schema:about ?item ; schema:isPartOf <https://pt.wikipedia.org/>` | (ver lb_results) | MEDIDO |
-| E1 Benfica (freguesia, admin_level 8): Overpass A1-A10 | NÃO MEDIDO (em curso) | área `rel(area.a)["name"="Benfica"]["admin_level"="8"];map_to_area` | - | EM CURSO |
 | E2 Benfica, Wikidata: entidades da freguesia (P131*, Q534230) com coordenadas | 28 | `SELECT (COUNT(DISTINCT ?item) AS ?n) WHERE { ?item wdt:P131* wd:Q534230 ; wdt:P625 ?c . }` | (ver lb_results) | MEDIDO |
 | E3 Benfica, Wikidata: dessas com artigo PT | 11 | idem + artigo PT | (ver lb_results) | MEDIDO |
+
+## Lumiar e Benfica (freguesias, admin_level 8 em OSM)
+
+| medição | Lumiar | Benfica |
+|---|---|---|
+| 1 vias com nome | MEDIDO | MEDIDO |
+| 2 vias com nome + name:etymology:wikidata | MEDIDO | MEDIDO |
+| 3 vias com nome + description/inscription | MEDIDO | MEDIDO |
+| 4 nwr historic | MEDIDO | MEDIDO |
+| 5 nwr tourism=museum | MEDIDO | MEDIDO |
+| 6 nwr heritage | MEDIDO | MEDIDO |
+| 7 nwr amenity~place_of_worship | MEDIDO | MEDIDO |
+| 8 nwr shop com name (só contagem) | MEDIDO | MEDIDO |
+| 9 nwr historic~memorial|plaque | MEDIDO | MEDIDO |
+| 10 nwr wikidata (total) | MEDIDO | MEDIDO |
+| 11 Wikidata: entidades P131* com coordenadas | MEDIDO | MEDIDO |
+| 12 Wikidata: dessas com artigo PT | MEDIDO | MEDIDO |
 
 ## Notas
 
