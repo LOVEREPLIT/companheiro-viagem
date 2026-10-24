@@ -37,6 +37,9 @@ Em curso a 24/10: Opus escreve `DESENHO-BASE-CONHECIMENTO.md`; Haiku escreve `sa
 - Editor Haiku sobre texto CML: 58/60 ok, 2 distorções, 0 invenções; checks automáticos e Sonnet validador apanharam 0 das 2 distorções; só o Opus as apanhou. Decisão: Haiku editor + checks automáticos + auditoria Opus; sem validador Sonnet. Regra para o brief do editor: preservar ressalvas («pode ser considerado») e não trocar obra adaptada por obra original.
 - Feito também: `base/c0_cml_toponimia.py` e `base/bruto/cml/toponimia-{lumiar,benfica}-2026-10-24.json.gz` (253 + 182, bate com o desenho). Pasta `base/` ainda não commitada.
 
+## C0 FEITO (24/10)
+`base/bruto/`: cml (toponímia Lumiar 253 / Benfica 182, património 11+12, casas religiosas), osm (Lumiar+Benfica, polígono + elementos: ~1135 em Benfica), wikidata (157 QIDs), wikipedia-pt (133 extractos). Scripts `base/c0_*.py`. Cartão de sessão nova «Marco 1 geo» proposto (task_0e8f7418) para C1→publicar. Falta o geosearch Wikipédia (opcional) e o Commons (só metadados).
+
 ## Próximo passo (por ordem)
 C0 restante (OSM por Overpass relações 6384124/6385130 a 15 s entre pedidos, património CML camadas 11+12, Wikidata, Wikipédia geosearch) → C1 fusão → C2 Haiku editor (lotes de 10, âncoras = números de frases, checks de `p4_checks.py`) → C3 auditoria Opus de 100 factos → tiles geohash-6 + `baseAqui` no `docs/index.html` → testes F1 em http://127.0.0.1:8124/ → publicar. Depois F2 (escrita de volta + backup com pop-up).
 
