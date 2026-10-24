@@ -1,6 +1,6 @@
 # Base de Conhecimento Geo — desenho (24/10/2026)
 
-Desenho, não implementação. Medições feitas hoje com pedidos reais (User-Agent `CompanheiroViagem/1.0`; o Overpass deu 429 duas vezes e passou à terceira). Não encontrei `saida/contagens_lisboa.md`, por isso os números abaixo são meus.
+Desenho, não implementação. Medições de hoje, com pedidos reais (o Overpass deu 429 duas vezes e passou à terceira). `saida/contagens_lisboa.md` não existia.
 
 ## 0. Avaliação da visão
 
@@ -13,7 +13,7 @@ Desenho, não implementação. Medições feitas hoje com pedidos reais (User-Ag
 
 **Crítica à H2:** tem uma falha de circularidade. Se o LLM propõe um facto e a confirmação vem do DuckDuckGo, a página pode ser gerada por IA. Só conta uma confirmação de domínio da lista branca (§4).
 
-**Achado que muda o marco 1:** Lumiar e Benfica são pobres na Wikipédia (14 e 17 artigos a 1,5 km, contra 56 a 1 km na Baixa) e na etimologia OSM (56 e 27 vias), mas ricos na toponímia CML (240 e 175 historiais). São um bom teste ao caso difícil, e o esqueleto da base é a toponímia CML, não a Wikipédia.
+**Achado:** Lumiar e Benfica são pobres na Wikipédia e na etimologia OSM, mas ricos na toponímia CML (§1). O esqueleto da base é a toponímia CML.
 
 ## 1. Medições
 
@@ -28,8 +28,8 @@ Desenho, não implementação. Medições feitas hoje com pedidos reais (User-Ag
 | Património CML (camadas 11 + 12) / casas religiosas | 222 + 63 / 76 |
 | OSM `historic` / museu+atracção+arte+miradouro / culto / `memorial` | 1 064 / 1 068 / 248 / 351 |
 | OSM com `wikidata` | 2 028 |
-| Wikidata com coordenadas (caixa Lisboa) / `P131*` Lisboa / com artigo PT | 2 930 / 2 167 / 899 |
-| Pessoas falecidas nascidas ou mortas em Lisboa, com artigo PT | 3 633 |
+| Wikidata com coordenadas (caixa) / `P131*` Lisboa / com artigo PT | 2 930 / 2 167 / 899 |
+| Falecidos nascidos/mortos em Lisboa, com artigo PT | 3 633 |
 
 **Marco 1 (relações OSM: Lumiar 6384124 e Benfica 6385130, admin_level 8)**
 
@@ -41,10 +41,8 @@ Desenho, não implementação. Medições feitas hoje com pedidos reais (User-Ag
 | Topónimos de pessoas (legenda com datas) | 191 | 116 |
 | CML bruto / gzip | 522 / 182 KB | 306 / 104 KB |
 | OSM historic / museu / atracção+arte+miradouro / culto / memorial | 48 / 2 / 23 / 10 / 14 | 46 / 0 / 15 / 10 / 6 |
-| OSM com wikidata (sem vias) | 49 | 63 |
-| Wikidata `P131+` freguesia | 45 | 27 |
+| OSM com wikidata (sem vias) / Wikidata `P131+` freguesia | 49 / 45 | 63 / 27 |
 | Wikipédia geosearch 1,5 km do centro | 14 | 17 |
-| Commons, ficheiros num raio de 1,5 km | ≥500 (tecto da API) | — |
 
 Notas:
 
@@ -67,7 +65,7 @@ Notas:
  "estado":"publicada|quarentena","esquema":1}
 ```
 
-Ids estáveis, por esta ordem de preferência: `wd:QID`, depois `cml:top:TOP_ID` ou `cml:pat:OBJECTID`, depois `osm:{n|w|r}ID`. Os outros ficam em `aliases`. Um id nunca se reutiliza. As fusões só acrescentam aliases.
+Id estável: `wd:QID`, senão `cml:top:TOP_ID`/`cml:pat:OBJECTID`, senão `osm:{n|w|r}ID`; os restantes ficam em `aliases`. Nunca se reutiliza um id.
 
 **Facto** (`base/factos/factos.jsonl`):
 
@@ -86,8 +84,8 @@ Ids estáveis, por esta ordem de preferência: `wd:QID`, depois `cml:top:TOP_ID`
 
 ## 3. Ficheiros e partição (decisão)
 
-- **Tiles geohash-6** (cerca de 1,2 × 0,6 km). Lisboa ocupa cerca de 140–160 tiles; o marco 1 cerca de 20–25. Estimativa: 30–60 KB gzip por tile.
-- Uma entidade vive no tile do seu centróide. Os tiles que uma via atravessa levam só um "stub" com `{id, pontos mais próximos, tile_casa}`.
+- **Tiles geohash-6** (≈1,2 × 0,6 km): Lisboa ≈ 140–160, marco 1 ≈ 20–25, 30–60 KB gzip cada.
+- A entidade vive no tile do centróide; os outros tiles que uma via atravessa levam um "stub" `{id, pontos, tile_casa}`.
 - `docs/base/indice.json` guarda o esquema, a versão, `{tile: {hash, n_factos, completo:{via,poi,pessoa}}}` e os polígonos simplificados das freguesias cobertas.
 - `docs/base/t/<geohash>.json` são os tiles derivados, gerados a partir dos `.jsonl` e nunca editados à mão.
 - `base/bruto/<fonte>/<freguesia>-<data>.json.gz` guarda os snapshots das respostas reais, em git. São a prova das âncoras: CML Lisboa ≈ 2 MB.
@@ -121,39 +119,33 @@ Ids estáveis, por esta ordem de preferência: `wd:QID`, depois `cml:top:TOP_ID`
 
 **Mecânica.**
 
-1. Um entrevistador (Haiku) faz perguntas estruturadas por entidade, com campos fechados (homenageado, profissão, nascimento e morte, nome anterior, ano de atribuição, facto marcante) e com a opção "não sei" explícita e valorizada.
-2. Respondem, sem verem as outras respostas nem os textos de C0, Haiku, Sonnet, Opus, gemma4:31b, qwen3.6:35b e gpt-oss:20b.
-3. Cada resposta é decomposta em **afirmações candidatas atómicas**.
-4. Só passam as candidatas com consenso.
-5. Cada candidata que passa vai para verificação: Wikipédia/Wikidata, depois Arquivo.pt, depois DuckDuckGo via `r.jina.ai`, só na lista branca.
-6. Só se torna facto com uma âncora literal encontrada numa fonte (C3). Sem fonte, fica com o estado `nao_verificada`, guardada só em `base/candidatas.jsonl` e **nunca narrada**.
+1. O entrevistador (Haiku) pergunta por entidade, com campos fechados (homenageado, profissão, nascimento e morte, nome anterior, ano de atribuição, facto marcante) e "não sei" explícito e valorizado.
+2. Respondem, às cegas (sem as outras respostas nem os textos de C0), Haiku, Sonnet, Opus, gemma4:31b, qwen3.6:35b e gpt-oss:20b.
+3. As respostas decompõem-se em **afirmações candidatas atómicas**; só passam as que têm consenso.
+4. Cada candidata procura-se na Wikipédia/Wikidata, depois no Arquivo.pt, depois no DuckDuckGo via `r.jina.ai` (lista branca).
+5. Só vira facto com âncora literal numa fonte (C3). Sem fonte fica `nao_verificada`, só em `base/candidatas.jsonl`, e **nunca é narrada**.
 
 **Limites:**
 
-- **Erros correlacionados.** Os modelos aprenderam com os mesmos textos (Wikipédia, sites turísticos) e herdam os mesmos erros, por isso concordância não é prova.
-- **Consenso por família.** O consenso conta-se por famílias independentes (Anthropic; Google; Qwen; OpenAI), não por modelos. Haiku, Sonnet e Opus valem um voto, e os dois Qwen também. Passa com ≥ 3 de 4 famílias.
-- **Factos hiperlocais.** A fiabilidade é baixa justamente onde a base mais precisa: ruas secundárias de Lumiar e Benfica. É lá que se mede.
-- **Pesquisa enviesada.** A pesquisa de confirmação não pode copiar a frase da candidata, porque isso traria páginas que a repetem. Pesquisa-se pelo nome da entidade e do campo, e a candidata só se compara depois.
+- **Erros correlacionados:** os modelos aprenderam com os mesmos textos e herdam os mesmos erros; concordância não é prova.
+- **Consenso por família, não por modelo:** Anthropic (Haiku, Sonnet e Opus = 1 voto), Google, Qwen (os dois = 1 voto), OpenAI. Passa com ≥ 3 de 4.
+- **Hiperlocal:** a fiabilidade é mais baixa justamente nas ruas secundárias de Lumiar e Benfica; é lá que se mede.
+- **Pesquisa enviesada:** não se pesquisa a frase da candidata (traria páginas que a repetem), mas o nome da entidade e o campo. A comparação faz-se depois.
 
 **Piloto (primeira tarefa da construção, antes de C2 em escala).**
 
-- **20 entidades com verdade conhecida**, em dois estratos de 10, e a verdade fica escondida dos modelos:
-  - **famosas:** etimologia em OSM/Wikidata e artigo na Wikipédia;
-  - **hiperlocais:** só historial CML, sem artigo.
-- **Verdade:** os campos `LEGENDA`, `HISTORIAL`, `DENOMINACOES_ANTERIORES` e `DATA_EDITAL` da CML, e o `name:etymology:wikidata` do OSM.
-- **Medições, por modelo, por família e para o consenso, em cada estrato:**
-  - precisão (certas / afirmadas);
-  - cobertura (afirmadas / perguntadas);
-  - taxa de "erro confiante".
-- **Corrigir as respostas:** os campos fechados corrigem-se por script (datas exactas, nomes normalizados); o texto livre corrige-o o Opus, com a amostra de discordâncias revista.
-- **Esforço:** cerca de 20 × 6 perguntas × 7 modelos, à volta de 0,5 $ nos modelos pagos; os locais só com OK do João e com o portão de VRAM.
+- **20 entidades em dois estratos de 10:** famosas (etimologia OSM/Wikidata e artigo na Wikipédia) e hiperlocais (só historial CML).
+- **Verdade, escondida dos modelos:** `LEGENDA`, `HISTORIAL`, `DENOMINACOES_ANTERIORES` e `DATA_EDITAL` da CML, e `name:etymology:wikidata`.
+- **Mede-se por modelo, por família e para o consenso, em cada estrato:** precisão (certas / afirmadas), cobertura (afirmadas / perguntadas) e erro confiante.
+- **Correcção:** os campos fechados por script; o texto livre pelo Opus.
+- **Esforço:** 20 × 6 perguntas × 7 modelos, cerca de 0,5 $ nos pagos; os locais com OK e portão de VRAM.
 
 **Critério de decisão** (aplicado ao estrato hiperlocal, que é o que interessa):
 
-- **"Fonte de candidatas"** (as candidatas com consenso vão para verificação automática) se a precisão do consenso for ≥ 90 %, o erro confiante ≤ 5 % e a cobertura ≥ 30 %.
-- **"Descobrir lacunas"** abaixo disso: a entrevista só gera perguntas e termos de pesquisa para C2b, e as respostas deitam-se fora.
-- Com cerca de 60 afirmações hiperlocais, 90 % observados dão um limite inferior de cerca de 80 % (Wilson). Por isso um resultado entre 85 % e 90 % repete-se com mais 20 entidades antes de decidir.
-- Em nenhum dos dois modos a entrevista cria um facto: só a fonte o cria.
+- **"Fonte de candidatas"** (o consenso vai para verificação automática): precisão do consenso ≥ 90 %, erro confiante ≤ 5 % e cobertura ≥ 30 %.
+- **"Descobrir lacunas"** abaixo disso: só se aproveitam perguntas e termos de pesquisa para C2b.
+- Com cerca de 60 afirmações hiperlocais, 90 % observados têm limite inferior de cerca de 80 % (Wilson): entre 85 e 90 %, repete-se com mais 20 entidades.
+- Em nenhum dos modos a entrevista cria factos; só a fonte os cria.
 
 ## 5. Protocolo de verificação
 
@@ -176,16 +168,11 @@ Ids estáveis, por esta ordem de preferência: `wd:QID`, depois `cml:top:TOP_ID`
 
 **Novo `baseAqui(lat,lon,raio)`:** lê os tiles do ponto e vizinhos (< 50 ms); um tile do índice em falta busca-se à própria origem com `comPrazo(…,1500)` e grava-se. É a primeira fonte de `canalHistoria(f)` e `detalheRua()`; o resto fica como fallback (§0.5).
 
-**Quando a base manda:**
-
-- `completo.via` no tile: `detalheRua` não chama a CML para o historial (o Nominatim só dá a rua se o GPS não casar com um stub).
-- `completo.poi`: `canalHistoria` só faz geosearch da Wikipédia quando a base em volta está toda em `M.ditos`.
-- Dados vivos nunca vêm da base.
-- Base e fonte viva divergem (artigo editado): fala-se a base e a divergência vai para `novos`.
+**Quando a base manda:** com `completo.via` no tile, `detalheRua` não chama a CML; com `completo.poi`, `canalHistoria` só faz geosearch quando a base em volta já está toda em `M.ditos`. Se a base e a fonte viva divergirem, fala-se a base e a divergência vai para `novos`. Dados vivos nunca vêm da base.
 
 **Escrita de volta:** o permanente vindo de fontes vivas vai para `novos`, com proveniência e estado `quarentena`. Pode ser falado como hoje (já tem URL) e só entra no mestre por exportação e C3. Deduplicação por `id`; `chave_dito` mantém o formato de `marcaDito`, para `M.ditos` continuar válido.
 
-**Falhas:** sem IndexedDB (janela privada) ou com esquema desconhecido, comportamento actual sem base, com aviso no registo.
+**Falhas:** sem IndexedDB ou com esquema desconhecido, comportamento actual.
 
 ## 7. Pré-viagem
 
@@ -235,10 +222,8 @@ Em `iniciaPreViagem`:
 
 ## 11. Riscos e o que NÃO fazer
 
-- LLM como fonte ou a "completar de memória"; factos sem âncora literal.
-- Confiar em páginas fora da lista branca.
-- Dados vivos na base; base em localStorage; um ficheiro gigante em vez de tiles.
-- Martelar Overpass, Nominatim ou DuckDuckGo; recolha em lote em runtime.
+- LLM como fonte (nem por consenso); factos sem âncora literal; páginas fora da lista branca.
+- Dados vivos na base; base em localStorage; martelar Overpass, Nominatim ou DuckDuckGo.
 - Comércio actual ou dados de pessoas vivas. "Lojas com História" (CML) é candidata **não verificada ao vivo**.
 - Licenças: OSM → ODbL, Wikipédia → CC BY-SA; obrigam a atribuição (ecrã "Fontes" e `indice.json`) e partilha nos mesmos termos. A licença CML confirma-se antes de publicar.
 - Pré-viagem a tocar em `M`; facetas publicadas sem auditoria; modelos locais sem OK e sem VRAM medida.
